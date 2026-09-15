@@ -1,0 +1,67 @@
+:root {
+  /* Color tokens — Roxo Metálico / Violeta Escuro tecnológico */
+  --bg-void: #120821;
+  --bg-deep: #1c0d38;
+  --bg-metallic-1: #2c1359;
+  --bg-metallic-2: #3d1e73;
+  --panel-glass: rgba(61, 30, 115, 0.32);
+  --panel-border: #ff2e9c;
+  --panel-border-soft: rgba(255, 46, 156, 0.45);
+
+  --accent-neon: #ff2e9c;
+  --accent-neon-dim: rgba(255, 46, 156, 0.18);
+  --accent-cyan: #35e6d8;
+  --accent-gold: #ffcc4d;
+
+  --text-primary: #f2e9fb;
+  --text-secondary: #b39cd4;
+  --text-muted: #7a6497;
+
+  --state-success: #33e6a0;
+  --state-success-bg: rgba(51, 230, 160, 0.12);
+  --state-error: #ff4568;
+  --state-error-bg: rgba(255, 69, 104, 0.12);
+
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+
+  --radius-panel: 18px;
+  --radius-control: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  background: radial-gradient(circle at 20% 0%, var(--bg-metallic-2) 0%, var(--bg-deep) 45%, var(--bg-void) 100%);
+  /* Tínhamos "background-attachment: fixed" aqui pra evitar o degradê
+     "quebrar" quando a página ficava mais alta que a tela. Mas isso, combinado
+     com os painéis que usam backdrop-filter (vidro fosco dos cards), causava
+     um artefato visual ao rolar a página (um remendo de cor deslocado por
+     cima do conteúdo). Como html/body/#root já usam min-height (não height
+     fixo), o fundo cresce naturalmente com o conteúdo e cobre a página toda
+     sem precisar do "fixed" — removido.  */
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+}
+
+::selection {
+  background: var(--accent-neon-dim);
+  color: var(--text-primary);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+}

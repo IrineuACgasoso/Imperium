@@ -1,0 +1,11 @@
+.firebase-gate {
+  border: 1px dashed rgba(242, 233, 251, 0.16);
+  border-radius: var(--radius-panel);
+  padding: 32px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.firebase-gate code {
+  color: var(--accent-cyan);
+}

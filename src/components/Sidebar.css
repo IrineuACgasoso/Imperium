@@ -1,0 +1,101 @@
+.sidebar {
+  width: 232px;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, var(--bg-metallic-1) 0%, var(--bg-deep) 100%);
+  border-right: 1px solid rgba(255, 46, 156, 0.15);
+  padding: 28px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+.sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 6px;
+}
+
+.sidebar__brand-mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  background: linear-gradient(135deg, var(--accent-neon), #7a2eff);
+  color: #150826;
+  flex-shrink: 0;
+}
+
+.sidebar__brand-name {
+  font-family: var(--font-display);
+  font-size: 13px;
+  line-height: 1.3;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar__nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-control);
+  color: var(--text-secondary);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sidebar__nav-item:hover {
+  background: rgba(255, 46, 156, 0.07);
+  color: var(--text-primary);
+}
+
+.sidebar__nav-item.is-active {
+  background: var(--accent-neon-dim);
+  color: var(--text-primary);
+}
+
+.sidebar__nav-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.sidebar__nav-item.is-active .sidebar__nav-dot {
+  background: var(--accent-neon);
+  box-shadow: 0 0 8px var(--accent-neon);
+}
+
+.sidebar__logout {
+  margin-top: auto;
+  padding: 10px 12px;
+  border: 1px solid rgba(242, 233, 251, 0.14);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sidebar__logout:hover {
+  border-color: var(--state-error);
+  color: var(--state-error);
+}

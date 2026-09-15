@@ -1,0 +1,244 @@
+/* Overlay: cobre só o card do gráfico (o pai relativo é .performance-chart),
+   não a tela toda — assim a prestação de contas fica centralizada sobre o
+   gráfico sem tampar o formulário de cadastro logo abaixo. */
+.day-detail-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(10, 4, 20, 0.55);
+  backdrop-filter: blur(3px);
+  border-radius: var(--radius-panel);
+}
+
+.day-detail {
+  width: 100%;
+  max-width: 420px;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 20px 22px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--panel-border-soft);
+  background: #170a30;
+  box-shadow: 0 24px 60px -16px rgba(0, 0, 0, 0.7);
+  animation: day-detail-in 0.15s ease;
+}
+
+@keyframes day-detail-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.day-detail__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.day-detail__eyebrow {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.day-detail__title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.day-detail__close {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+
+.day-detail__close:hover {
+  color: var(--text-primary);
+}
+
+.day-detail__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.day-detail__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(242, 233, 251, 0.08);
+}
+
+.day-detail__item-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.day-detail__item-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.day-detail__item-input {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(242, 233, 251, 0.2);
+  background: rgba(18, 8, 33, 0.6);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.day-detail__total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  margin-top: 4px;
+  border-top: 1px dashed rgba(242, 233, 251, 0.14);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.day-detail__total strong {
+  color: var(--accent-neon);
+  font-size: 16px;
+}
+
+.day-detail__origem {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.day-detail__empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.day-detail__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.day-detail__edit {
+  padding: 8px 14px;
+  border-radius: var(--radius-control);
+  border: 1px solid rgba(53, 230, 216, 0.4);
+  background: rgba(53, 230, 216, 0.1);
+  color: var(--accent-cyan);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.day-detail__edit:hover {
+  border-color: var(--accent-cyan);
+}
+
+.day-detail__save {
+  padding: 8px 14px;
+  border-radius: var(--radius-control);
+  border: none;
+  background: linear-gradient(120deg, var(--accent-neon), #c92eff);
+  color: #150826;
+  font-weight: 600;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.day-detail__save:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.day-detail__cancel {
+  padding: 8px 14px;
+  border-radius: var(--radius-control);
+  border: 1px solid rgba(242, 233, 251, 0.16);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.day-detail__delete {
+  padding: 8px 14px;
+  border-radius: var(--radius-control);
+  border: 1px solid rgba(255, 69, 104, 0.4);
+  background: var(--state-error-bg);
+  color: var(--state-error);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.day-detail__delete:hover {
+  border-color: var(--state-error);
+}
+
+.day-detail__list {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.day-detail__list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(242, 233, 251, 0.08);
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.day-detail__list-desc {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.day-detail__list-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.day-detail__delete-inline {
+  border: none;
+  background: transparent;
+  color: var(--state-error);
+  font-size: 11.5px;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}

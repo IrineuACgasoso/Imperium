@@ -1,0 +1,61 @@
+rules_version = '2';
+
+// Regras do Imperium das Chaves.
+//
+// O app usa Firebase Authentication de verdade (login com e-mail fixo +
+// senha, ver src/components/Login.jsx). Como só existe UM usuário de acesso
+// (você), a regra é simples: qualquer usuário autenticado pode ler/escrever
+// tudo. Não há multi-usuário/multi-permissão nesta fase — se isso mudar no
+// futuro (funcionários com login próprio, por exemplo), estas regras
+// precisam ganhar checagem por papel/UID.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ATENÇÃO: esta função PRECISA ficar dentro do bloco `service` /
+    // `match /databases/...`. Ela estava declarada no topo do arquivo, fora
+    // do service, o que é sintaxe inválida — o `firebase deploy` rejeita o
+    // arquivo inteiro. Como o deploy falhava, o projeto continuou rodando
+    // uma versão ANTIGA das regras (anterior à criação da coleção `gastos`),
+    // e por isso só `gastos` dava permission-denied enquanto `funcionarios`
+    // funcionava normalmente.
+    function estaAutenticado() {
+      return request.auth != null;
+    }
+
+    match /filiais/{filialId} {
+      allow read, write: if estaAutenticado();
+
+      match /funcionarios/{funcionarioId} {
+        allow read, write: if estaAutenticado();
+      }
+
+      match /gastos/{gastoId} {
+        allow read, write: if estaAutenticado();
+      }
+
+      match /listasAuxiliares/{listaId} {
+        allow read, write: if estaAutenticado();
+      }
+
+      match /registrosDiarios/{dataId} {
+        allow read, write: if estaAutenticado();
+      }
+
+      match /registrosMensaisHistoricos/{mesId} {
+        allow read, write: if estaAutenticado();
+      }
+
+      match /vendasPorFuncionarioMensal/{registroId} {
+        allow read, write: if estaAutenticado();
+      }
+
+      // Staging é onde a IA grava o que extraiu de um upload, antes de
+      // revisão humana. A Cloud Function usa o Admin SDK, que ignora estas
+      // regras — elas só governam acesso direto do client.
+      match /staging/{stagingId} {
+        allow read, write: if estaAutenticado();
+      }
+    }
+  }
+}
