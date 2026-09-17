@@ -3,10 +3,13 @@ import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../config/firebase.js';
 import { useFilialCollection } from '../hooks/useFilialCollection.js';
 import { handleEnterNavigation } from '../utils/formNav.js';
+import { usePdfImport } from '../hooks/usePdfImport.js';
+import { parseDespesasCaixa } from '../parsers/despesasCaixa.js';
 import FirebaseGate from './FirebaseGate.jsx';
 import Combobox from './Combobox.jsx';
 import { CATEGORIAS_GASTO } from '../data/categoriasGasto.js';
 import './CrudTab.css';
+import './PdfImport.css';
 
 export const CATEGORIAS = CATEGORIAS_GASTO;
 
@@ -193,6 +196,8 @@ function GastosTabInner({ filialId }) {
 
       {error && <p className="crud-tab__error">{error}</p>}
 
+      <ImportarDespesasCaixa filialId={filialId} funcionarios={funcionarios} />
+
       <table className="crud-tab__table gastos-table">
         <thead>
           <tr>
@@ -238,6 +243,155 @@ function GastosTabInner({ filialId }) {
         Funcionários, no mês correspondente. Nos campos com lista, use ↑/↓ para navegar e Enter
         para escolher.
       </p>
+    </div>
+  );
+}
+
+// Importa o relatório "Histórico das Despesas" (caixa do dia) do CDS.
+// SANGRIA é mostrada só como informação — não é lançada como gasto (é
+// dinheiro saindo do caixa físico pra ir pro banco, não um prejuízo).
+function ImportarDespesasCaixa({ filialId, funcionarios }) {
+  const { texto, nomeArquivo, carregando, erro, handleFile, limpar } = usePdfImport();
+  const { add: addGasto } = useFilialCollection(filialId, 'gastos', 'data');
+  const [resultado, setResultado] = useState(null);
+  const [confirmando, setConfirmando] = useState(false);
+
+  function onFileChange(e) {
+    const file = e.target.files?.[0];
+    setResultado(null);
+    handleFile(file);
+    e.target.value = '';
+  }
+
+  if (texto && resultado === null) {
+    setResultado(parseDespesasCaixa(texto, funcionarios));
+  }
+
+  function editarItem(idx, campo, valor) {
+    setResultado((r) => {
+      const itens = [...r.itens];
+      itens[idx] = { ...itens[idx], [campo]: campo === 'valor' ? parseFloat(valor) || 0 : valor };
+      return { ...r, itens };
+    });
+  }
+
+  const itensLancaveis = resultado?.itens.filter((it) => !it.ehSangria) ?? [];
+  const sangrias = resultado?.itens.filter((it) => it.ehSangria) ?? [];
+
+  async function confirmar() {
+    setConfirmando(true);
+    try {
+      for (const item of itensLancaveis) {
+        // ID determinístico pelo nº de lançamento do CDS: reimportar o mesmo
+        // relatório sobrescreve em vez de duplicar o gasto.
+        await setDoc(doc(db, 'filiais', filialId, 'gastos', `caixa-despesa_${item.lancamento}`), {
+          data: resultado.data,
+          categoria: item.categoria,
+          valor: item.valor,
+          descricao: item.textoOriginal,
+          ...(item.funcionarioId
+            ? { funcionarioId: item.funcionarioId, funcionarioNome: item.funcionarioNome }
+            : {}),
+          origem: 'importado-caixa-diario',
+        });
+      }
+      limpar();
+      setResultado(null);
+    } finally {
+      setConfirmando(false);
+    }
+  }
+
+  function cancelar() {
+    limpar();
+    setResultado(null);
+  }
+
+  return (
+    <div className="pdf-import">
+      <div className="pdf-import__header">
+        <span className="pdf-import__label">Importar despesas do caixa (PDF "Histórico das Despesas"):</span>
+        <input type="file" accept="application/pdf" onChange={onFileChange} className="pdf-import__file" />
+      </div>
+
+      {carregando && <p className="pdf-import__status">Lendo PDF…</p>}
+      {erro && <p className="pdf-import__error">{erro}</p>}
+
+      {resultado && (
+        <div className="pdf-import__preview">
+          <p className="pdf-import__preview-title">
+            {nomeArquivo} — dia {resultado.data ?? '(data não identificada)'}
+          </p>
+
+          {sangrias.length > 0 && (
+            <p className="pdf-import__status">
+              {sangrias.length} sangria(s) identificada(s) somando R${' '}
+              {sangrias.reduce((s, x) => s + x.valor, 0).toFixed(2)} — dinheiro que foi pro banco,
+              não é gasto, e por isso NÃO será lançado.
+            </p>
+          )}
+
+          <table className="pdf-import__table pdf-import__table--rows">
+            <thead>
+              <tr>
+                <th>Categoria</th>
+                <th>Funcionário</th>
+                <th>Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              {itensLancaveis.map((item, idx) => (
+                <tr key={item.lancamento}>
+                  <td>
+                    <Combobox
+                      value={item.categoria}
+                      onChange={(v) => editarItem(idx, 'categoria', v)}
+                      options={CATEGORIAS_GASTO.map((c) => ({ value: c, label: c }))}
+                      allowFree={false}
+                      minWidth={160}
+                    />
+                  </td>
+                  <td className={item.funcionarioNome ? '' : 'pdf-import__unmatched'}>
+                    {item.funcionarioNome ?? '(nenhum vínculo encontrado)'}
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={item.valor}
+                      onChange={(e) => editarItem(idx, 'valor', e.target.value)}
+                    />
+                  </td>
+                </tr>
+              ))}
+              {itensLancaveis.length === 0 && (
+                <tr>
+                  <td colSpan={3}>Nenhuma despesa lançável identificada nesse PDF.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+
+          <div className="pdf-import__actions">
+            <button
+              className="pdf-import__confirm"
+              onClick={confirmar}
+              disabled={confirmando || itensLancaveis.length === 0 || !resultado.data}
+            >
+              {confirmando ? 'Salvando…' : 'Confirmar e lançar'}
+            </button>
+            <button className="pdf-import__cancel" onClick={cancelar}>
+              Cancelar
+            </button>
+          </div>
+          {!resultado.data && (
+            <p className="pdf-import__error">
+              Não consegui identificar a data no relatório — confirme que é mesmo um "Histórico
+              das Despesas" exportado do CDS.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

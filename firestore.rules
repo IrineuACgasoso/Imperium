@@ -30,6 +30,10 @@ service cloud.firestore {
         allow read, write: if estaAutenticado();
       }
 
+      match /clientes/{clienteId} {
+        allow read, write: if estaAutenticado();
+      }
+
       match /gastos/{gastoId} {
         allow read, write: if estaAutenticado();
       }
@@ -47,13 +51,6 @@ service cloud.firestore {
       }
 
       match /vendasPorFuncionarioMensal/{registroId} {
-        allow read, write: if estaAutenticado();
-      }
-
-      // Staging é onde a IA grava o que extraiu de um upload, antes de
-      // revisão humana. A Cloud Function usa o Admin SDK, que ignora estas
-      // regras — elas só governam acesso direto do client.
-      match /staging/{stagingId} {
         allow read, write: if estaAutenticado();
       }
     }

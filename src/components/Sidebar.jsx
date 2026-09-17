@@ -4,8 +4,8 @@ import './Sidebar.css';
 const NAV_ITEMS = [
   { id: 'vendas', label: 'Vendas' },
   { id: 'funcionarios', label: 'Funcionários' },
+  { id: 'clientes', label: 'Clientes' },
   { id: 'gastos', label: 'Gastos' },
-  { id: 'importar', label: 'Importar dados (IA)' },
 ];
 
 export default function Sidebar({

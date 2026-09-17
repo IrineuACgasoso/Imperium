@@ -3,9 +3,9 @@ import { collection, addDoc, onSnapshot, serverTimestamp } from 'firebase/firest
 import { signOut } from 'firebase/auth';
 import Sidebar from './Sidebar.jsx';
 import PerformanceChart from './PerformanceChart.jsx';
-import ImportPanel from './ImportPanel.jsx';
 import FuncionariosTab from './FuncionariosTab.jsx';
 import GastosTab from './GastosTab.jsx';
+import ClientesTab from './ClientesTab.jsx';
 import VendasTab from './VendasTab.jsx';
 import { db, auth, firebaseIsConfigured } from '../config/firebase.js';
 import './Dashboard.css';
@@ -13,13 +13,16 @@ import './Dashboard.css';
 const TAB_LABELS = {
   vendas: 'Vendas',
   funcionarios: 'Funcionários',
+  clientes: 'Clientes',
   gastos: 'Gastos',
-  importar: 'Importar dados (IA)',
 };
 
 const MOCK_FILIAIS = [{ id: 'recife-matriz', nome: 'Recife — Matriz' }];
 
 const CHART_MODES = ['vendas', 'funcionarios', 'gastos'];
+// "clientes" não tem gráfico dedicado ainda (é a base pra uma futura
+// "Vendas por Cliente"), então não integra o CHART_MODES — o gráfico
+// principal permanece no que estava antes de abrir essa aba.
 
 export default function Dashboard({ onLogout }) {
   const [activeTab, setActiveTab] = useState(null);
@@ -91,15 +94,13 @@ export default function Dashboard({ onLogout }) {
         </div>
 
         {activeTab && activeFilialId && (
-          <div className={activeTab === 'importar' ? 'dashboard__import-slot' : 'dashboard__tab-panel'}>
-            {activeTab !== 'importar' && (
-              <span className="dashboard__tab-eyebrow">{TAB_LABELS[activeTab]}</span>
-            )}
+          <div className="dashboard__tab-panel">
+            <span className="dashboard__tab-eyebrow">{TAB_LABELS[activeTab]}</span>
 
             {activeTab === 'vendas' && <VendasTab filialId={activeFilialId} />}
             {activeTab === 'funcionarios' && <FuncionariosTab filialId={activeFilialId} />}
+            {activeTab === 'clientes' && <ClientesTab filialId={activeFilialId} />}
             {activeTab === 'gastos' && <GastosTab filialId={activeFilialId} />}
-            {activeTab === 'importar' && <ImportPanel filialId={activeFilialId} />}
           </div>
         )}
       </main>
