@@ -12,6 +12,25 @@ export const CATEGORIAS_GASTO = [
   'ADIANTAMENTO SALÁRIO',
 ];
 
+// Categoria "guarda-chuva" atribuída automaticamente a todo débito importado
+// do extrato que ainda não foi associado a nada — nunca aparece na lista de
+// escolha (não é uma categoria de verdade), só sinaliza "falta categorizar".
+export const CATEGORIA_PENDENTE = 'A CATEGORIZAR';
+
+// Qual campo extra cada categoria abre. `funcionario` usa a lista de
+// funcionários cadastrados (fechada); `lista` usa uma lista auxiliar que
+// cresce sozinha conforme o usuário digita nomes novos. Compartilhado entre
+// o formulário de Gastos e o "Associar Gasto" do extrato, pra manter as
+// duas telas categorizando exatamente do mesmo jeito.
+export const CAMPO_EXTRA_GASTO = {
+  'SALÁRIO': { tipo: 'funcionario', label: 'Funcionário' },
+  'ADIANTAMENTO SALÁRIO': { tipo: 'funcionario', label: 'Funcionário' },
+  GASOLINA: { tipo: 'funcionario', label: 'Funcionário' },
+  PEDIDOS: { tipo: 'lista', lista: 'distribuidoras', label: 'Distribuidora' },
+  IMPOSTOS: { tipo: 'lista', lista: 'tiposImposto', label: 'Tipo' },
+};
+
+
 // Chave usada no gráfico para "todos os gastos somados".
 export const GASTOS_TODOS_KEY = 'gastos';
 

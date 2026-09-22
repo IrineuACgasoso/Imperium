@@ -1,0 +1,125 @@
+.performance-chart {
+  position: relative;
+  background: var(--panel-glass);
+  border: 1px solid var(--panel-border-soft);
+  border-radius: var(--radius-panel);
+  padding: 24px 24px 18px;
+  display: flex;
+  flex-direction: column;
+  will-change: backdrop-filter;
+  backdrop-filter: blur(10px);
+}
+
+.performance-chart__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.performance-chart__eyebrow {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.performance-chart__title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.performance-chart__funcionarios {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(242, 233, 251, 0.08);
+}
+
+.performance-chart__funcionario-chip--all {
+  font-weight: 600;
+  background: rgba(53, 230, 216, 0.1);
+  border-color: rgba(53, 230, 216, 0.4);
+  color: var(--accent-cyan);
+  margin-right: 4px;
+}
+
+.performance-chart__funcionario-chip--all:hover {
+  border-color: var(--accent-cyan);
+  color: var(--text-primary);
+}
+
+.performance-chart__funcionario-chip {
+  padding: 6px 13px;
+  border-radius: 999px;
+  border: 1px solid rgba(242, 233, 251, 0.16);
+  background: rgba(18, 8, 33, 0.45);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.performance-chart__funcionario-chip:hover {
+  border-color: var(--accent-neon);
+  color: var(--text-primary);
+}
+
+.performance-chart__funcionario-chip.is-active {
+  background: var(--accent-neon-dim);
+  border-color: var(--accent-neon);
+  color: var(--text-primary);
+}
+
+.performance-chart__canvas {
+  height: 320px;
+  min-height: 320px;
+  position: relative;
+}
+
+.performance-chart__empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.performance-chart__funcionarios-empty {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.performance-chart__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
+.performance-chart__type-toggle {
+  padding: 8px 14px;
+  border-radius: var(--radius-control);
+  border: 1px solid rgba(242, 233, 251, 0.16);
+  background: rgba(18, 8, 33, 0.45);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.performance-chart__type-toggle:hover {
+  border-color: var(--accent-cyan);
+  color: var(--text-primary);
+}

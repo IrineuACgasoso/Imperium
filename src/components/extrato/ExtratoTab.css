@@ -1,0 +1,193 @@
+.extrato {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.extrato__bancos {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.extrato__banco {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 240px;
+  padding: 18px 20px;
+  border-radius: var(--radius-panel);
+  border: 1px solid var(--panel-border-soft);
+  background: rgba(61, 30, 115, 0.28);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.extrato__banco:hover:not(.is-disabled) {
+  border-color: var(--accent-neon);
+  background: rgba(255, 46, 156, 0.1);
+}
+
+.extrato__banco.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.extrato__banco-nome {
+  font-family: var(--font-display);
+  font-size: 15px;
+}
+
+.extrato__banco-nota {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.extrato__voltar {
+  align-self: flex-start;
+  padding: 6px 12px;
+  border: 1px solid rgba(242, 233, 251, 0.16);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.extrato__toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.extrato__busca {
+  flex: 1;
+  min-width: 240px;
+  padding: 9px 12px;
+  border-radius: var(--radius-control);
+  border: 1px solid rgba(242, 233, 251, 0.16);
+  background: rgba(18, 8, 33, 0.5);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.extrato__saldo {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+/* 1 tela de altura, igual ao que foi feito em Pendências — mesmo motivo:
+   evita a página crescer sem limite (o extrato pode ter centenas de
+   lançamentos) e ajuda a evitar o flash branco em scroll rápido. */
+.extrato__table-scroll {
+  max-height: 78vh;
+  overflow-y: auto;
+  border: 1px solid rgba(242, 233, 251, 0.08);
+  border-radius: var(--radius-control);
+}
+
+.extrato__table-scroll .extrato__table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-deep);
+  z-index: 1;
+}
+
+.extrato__table tr {
+  cursor: context-menu;
+}
+
+.extrato__table tr.is-conciliado {
+  background: var(--state-success-bg);
+}
+
+.extrato__table tr.is-conciliado-gasto {
+  background: rgba(255, 92, 92, 0.08);
+}
+
+.extrato__historico {
+  max-width: 320px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+
+.extrato__doc {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.extrato__cliente {
+  color: var(--accent-cyan);
+}
+
+.extrato__vazio {
+  color: var(--text-muted);
+}
+
+.extrato__num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.extrato__valor--credito {
+  color: var(--state-success);
+}
+
+.extrato__valor--debito {
+  color: var(--state-error);
+}
+
+/* --- Modal genérico (associar cliente, resolver diferença) --- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 180;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(9, 4, 18, 0.72);
+  will-change: backdrop-filter;
+  backdrop-filter: blur(3px);
+}
+
+.modal {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(460px, 92vw);
+  padding: 24px;
+  border-radius: var(--radius-panel);
+  border: 1px solid var(--panel-border-soft);
+  background: #1a0c34;
+  box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.8);
+}
+
+.modal__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.modal__desc {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.modal__actions {
+  display: flex;
+  gap: 10px;
+}
+
+.modal__nota {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}

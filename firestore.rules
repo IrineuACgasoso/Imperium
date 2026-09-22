@@ -53,6 +53,40 @@ service cloud.firestore {
       match /vendasPorFuncionarioMensal/{registroId} {
         allow read, write: if estaAutenticado();
       }
+
+      // --- Conciliação bancária ---
+      // Lançamentos importados do extrato do banco.
+      match /extratoLancamentos/{lancamentoId} {
+        allow read, write: if estaAutenticado();
+      }
+
+      // Linhas importadas do extrato de maquininha (Rede, Itaú...). Mesma
+      // regra das demais coleções da filial — ver conciliacaoCartao.js.
+      match /extratoCartao/{lancamentoId} {
+        allow read, write: if estaAutenticado();
+      }
+
+      // Vínculo conta bancária (CPF/CNPJ ou nome) -> cliente cadastrado.
+      match /vinculosBancarios/{vinculoId} {
+        allow read, write: if estaAutenticado();
+      }
+
+      // Vínculo conta bancária -> categoria de gasto (Associar Gasto), pra
+      // débitos futuros da mesma conta já entrarem categorizados sozinhos.
+      match /vinculosGastoBancarios/{vinculoId} {
+        allow read, write: if estaAutenticado();
+      }
+
+      // Fila de vendas individuais vindas do Caixa Diário do CDS.
+      match /pendenciasVendas/{vendaId} {
+        allow read, write: if estaAutenticado();
+      }
+
+      // Baixas (venda(s) <-> pagamento(s) conciliados). Expiram em 7 dias,
+      // limpeza feita pelo próprio app ao abrir a aba Pendências.
+      match /baixas/{baixaId} {
+        allow read, write: if estaAutenticado();
+      }
     }
   }
 }

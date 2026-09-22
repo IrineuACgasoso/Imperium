@@ -40,16 +40,38 @@ html, body, #root {
 
 body {
   font-family: var(--font-body);
-  background: radial-gradient(circle at 20% 0%, var(--bg-metallic-2) 0%, var(--bg-deep) 45%, var(--bg-void) 100%);
-  /* Tínhamos "background-attachment: fixed" aqui pra evitar o degradê
-     "quebrar" quando a página ficava mais alta que a tela. Mas isso, combinado
-     com os painéis que usam backdrop-filter (vidro fosco dos cards), causava
-     um artefato visual ao rolar a página (um remendo de cor deslocado por
-     cima do conteúdo). Como html/body/#root já usam min-height (não height
-     fixo), o fundo cresce naturalmente com o conteúdo e cobre a página toda
-     sem precisar do "fixed" — removido.  */
+  /* Fundo liso e barato — só um fallback sólido. O degradê de verdade agora
+     vive em ::before (ver comentário abaixo), então isto nunca precisa ser
+     re-pintado durante o scroll, por mais alta que a página fique. */
+  background: var(--bg-void);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
+}
+
+/* CAUSA RAIZ do "tela branca ao scrollar rápido": o degradê ficava pintado
+   diretamente no `background` do <body>, e o <body> cresce até a altura
+   de TODO o conteúdo (as tabelas de Extrato/Pendências passam de milhares
+   de pixels de altura). Um `radial-gradient` desse tamanho é caro de
+   rasterizar, e ao scrollar rápido o Chrome não consegue desenhar os
+   tiles novos a tempo — aparece um branco/vazio até o degradê "alcançar"
+   o scroll.
+   Já tínhamos tentado resolver isso com `background-attachment: fixed`
+   no <body>, mas isso quebrava os painéis com `backdrop-filter` (o vidro
+   fosco pegava a camada errada ao scrollar — o tal "remendo deslocado").
+   A correção de verdade é diferente de "background-attachment: fixed":
+   é um elemento PRÓPRIO, `position: fixed`, do tamanho da viewport, atrás
+   de tudo (z-index -1). Isso vira uma única camada de composição do
+   tamanho da tela, pintada uma vez só e nunca mais — nem quando a página
+   cresce, nem quando você scrolla — e como é um elemento de verdade (não
+   uma propriedade de background), o `backdrop-filter` dos painéis
+   consegue amostrar a camada certa por baixo dele sem o artefato antigo. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(circle at 20% 0%, var(--bg-metallic-2) 0%, var(--bg-deep) 45%, var(--bg-void) 100%);
+  pointer-events: none;
 }
 
 button {

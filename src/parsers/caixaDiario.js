@@ -1,3 +1,5 @@
+import { arredondar2 } from '../utils/numero.js';
+
 // Parser específico do relatório "Caixa Detalhado" (um único dia) do CDS.
 // Puro texto/regex — nenhuma IA envolvida. Ver parsers/pdfToText.js para
 // como o PDF vira texto linha-a-linha antes de chegar aqui.
@@ -39,19 +41,43 @@ function classificarFormaPagamento(forma) {
  *   totalRelatado: number,      // "Subtotal Vendas" impresso no rodapé
  *   consistente: boolean,       // soma bateu com o total impresso?
  *   clientesNovos: string[],    // nomes únicos de cliente (sem "CONSUMIDOR")
+ *   vendasDetalhadas: Array<{numeroVenda,clienteNome,valor,forma,campo}>,
  * }}
  */
 export function parseCaixaDiario(texto) {
   const linhas = texto.split('\n').map((l) => l.trim()).filter(Boolean);
 
-  // Data do relatório: "Período: 16/09/2026 à 16/09/2026"
-  const matchPeriodo = texto.match(/Per[ií]odo:\s*(\d{2})\/(\d{2})\/(\d{4})/);
-  const data = matchPeriodo
-    ? `${matchPeriodo[3]}-${matchPeriodo[2]}-${matchPeriodo[1]}`
-    : null;
+  // Data do relatório: "Período: 16/09/2026 à 16/09/2026". As duas datas
+  // PRECISAM ser iguais — um caixa detalhado é sempre de um único dia. Se
+  // vierem diferentes, é sinal de que exportaram o relatório errado (o de
+  // período/mês, que tem outro formato e outro botão no CDS), e é melhor
+  // rejeitar na hora do que silenciosamente jogar tudo numa data só.
+  const matchPeriodo = texto.match(
+    /Per[ií]odo:\s*(\d{2})\/(\d{2})\/(\d{4})\s*[àa]\s*(\d{2})\/(\d{2})\/(\d{4})/
+  );
+  const dataInicio = matchPeriodo ? `${matchPeriodo[3]}-${matchPeriodo[2]}-${matchPeriodo[1]}` : null;
+  const dataFim = matchPeriodo ? `${matchPeriodo[6]}-${matchPeriodo[5]}-${matchPeriodo[4]}` : null;
+
+  if (dataInicio && dataFim && dataInicio !== dataFim) {
+    return {
+      data: null,
+      periodoInvalido: true,
+      erro: `Este arquivo cobre um período de ${matchPeriodo[1]}/${matchPeriodo[2]}/${matchPeriodo[3]} até ${matchPeriodo[4]}/${matchPeriodo[5]}/${matchPeriodo[6]}, não um único dia. Exporte o "Caixa Detalhado" de uma data específica no CDS e importe de novo.`,
+      vendas: { dinheiro: 0, cartao: 0, pix: 0, boleto: 0, promissoria: 0, outros: 0, totalVendas: 0 },
+      totalRelatado: null,
+      consistente: true,
+      clientesNovos: [],
+      vendasDetalhadas: [],
+    };
+  }
+
+  const data = dataInicio;
 
   const vendas = { dinheiro: 0, cartao: 0, pix: 0, boleto: 0, promissoria: 0, outros: 0 };
   const clientesNovos = new Set();
+  // Linha a linha, além dos totais: cada venda individual, que é o que
+  // alimenta a aba Pendências (conciliação com o extrato do banco).
+  const vendasDetalhadas = [];
   let formaAtual = null;
 
   linhas.forEach((linha) => {
@@ -73,29 +99,46 @@ export function parseCaixaDiario(texto) {
     if (matchLinhaCliente && formaAtual) {
       const nome = matchLinhaCliente[1].trim();
       if (nome && nome.toUpperCase() !== 'CONSUMIDOR') clientesNovos.add(nome);
+
+      // Número da venda, quando o layout o traz no começo da linha. Nem toda
+      // seção do relatório tem (a de DINHEIRO, por exemplo, não), então ele é
+      // opcional — a conciliação nunca depende dele, só o exibe.
+      // O `(?!\/)` impede que a DATA no começo da linha (ex: "16/09/2026")
+      // seja confundida com número de venda — foi exatamente o que acontecia
+      // na seção DINHEIRO, que não traz número.
+      const matchNumero = linha.match(/^(\d{1,10})(?!\/)\s/);
+      vendasDetalhadas.push({
+        numeroVenda: matchNumero ? matchNumero[1] : '',
+        clienteNome: nome,
+        valor: paraNumero(matchLinhaCliente[2]),
+        forma: formaAtual,
+        campo: classificarFormaPagamento(formaAtual),
+      });
     }
 
     // Totais por forma de pagamento: "TOTAL PIX RECIFE R$ 8.384,84"
     const matchTotalForma = linha.match(/^TOTAL\s+.+?R\$\s*([\d.,]+)\s*$/i);
     if (matchTotalForma && formaAtual) {
       const campo = classificarFormaPagamento(formaAtual);
-      vendas[campo] += paraNumero(matchTotalForma[1]);
+      vendas[campo] = arredondar2(vendas[campo] + paraNumero(matchTotalForma[1]));
       formaAtual = null;
     }
   });
 
   const matchSubtotal = texto.match(/Subtotal Vendas\s*R\$\s*([\d.,]+)/i);
   const totalRelatado = matchSubtotal ? paraNumero(matchSubtotal[1]) : null;
-  const totalVendas = Object.values(vendas).reduce((a, b) => a + b, 0);
+  const totalVendas = arredondar2(Object.values(vendas).reduce((a, b) => a + b, 0));
 
   return {
     data,
+    periodoInvalido: false,
     vendas: { ...vendas, totalVendas },
     totalRelatado,
     // Diferença de até 1 centavo é só arredondamento de parcelas — não vale
     // marcar como inconsistente por causa disso.
     consistente: totalRelatado == null || Math.abs(totalRelatado - totalVendas) < 0.02,
     clientesNovos: Array.from(clientesNovos).sort((a, b) => a.localeCompare(b)),
+    vendasDetalhadas,
   };
 }
 
