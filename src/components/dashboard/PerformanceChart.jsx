@@ -99,7 +99,11 @@ function FuncionarioTooltip({ active, payload, label, funcionariosById }) {
 }
 
 export default function PerformanceChart({ filialId, mode }) {
-  const [period, setPeriod] = useState('mes');
+  const isFuncionariosMode = mode === 'funcionarios';
+  // Na aba Funcionários o período fica travado em "Ano" (o pedido é ver os
+  // meses do ano inteiro assim que abre, não o "Mês" que faz sentido nos
+  // outros modos) — por isso nem mostramos o PeriodSelector aqui embaixo.
+  const [period, setPeriod] = useState(isFuncionariosMode ? 'ano' : 'mes');
   const [customRange, setCustomRange] = useState({ start: '', end: '' });
   const [metricKey, setMetricKey] = useState(DEFAULT_METRIC_BY_MODE[mode] ?? 'vendasTotais');
   const [selectedFuncionarioIds, setSelectedFuncionarioIds] = useState([]);
@@ -128,6 +132,8 @@ export default function PerformanceChart({ filialId, mode }) {
   useEffect(() => {
     setMetricKey(DEFAULT_METRIC_BY_MODE[mode] ?? 'vendasTotais');
     setSelectedDayIso(null);
+    if (isFuncionariosMode) setPeriod('ano');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, filialId]);
 
   useEffect(() => {
@@ -169,8 +175,6 @@ export default function PerformanceChart({ filialId, mode }) {
       breakdown: e.breakdown,
     }));
   }, [funcionarioSeriesById, selectedFuncionarioIds]);
-
-  const isFuncionariosMode = mode === 'funcionarios';
 
   const chartData = useMemo(() => {
     if (isFuncionariosMode) {
@@ -284,12 +288,14 @@ export default function PerformanceChart({ filialId, mode }) {
           <span className="performance-chart__eyebrow">Painel principal</span>
           <h2 className="performance-chart__title">{headerTitle}</h2>
         </div>
-        <PeriodSelector
-          period={period}
-          onChangePeriod={setPeriod}
-          customRange={customRange}
-          onChangeCustomRange={setCustomRange}
-        />
+        {!isFuncionariosMode && (
+          <PeriodSelector
+            period={period}
+            onChangePeriod={setPeriod}
+            customRange={customRange}
+            onChangeCustomRange={setCustomRange}
+          />
+        )}
       </header>
 
       {isFuncionariosMode && (

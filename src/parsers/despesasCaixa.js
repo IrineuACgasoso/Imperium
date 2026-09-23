@@ -69,6 +69,40 @@ function paraNumero(str) {
   return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
 }
 
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Acha, num bloco já normalizado, qual funcionário CADASTRADO aparece mais
+// cedo — mas casando por PALAVRA (\b...\b), não por substring crua como
+// antes. Isso resolve o caso do adiantamento em que a Descrição só traz o
+// primeiro nome ("FLAVIO - PEDIDOS") e o cadastro tem nome completo
+// ("FLAVIO VIAGEM" — palavra a mais no cadastro): quando o nome completo
+// não aparece inteiro no bloco, cai pro fallback de casar só a primeira
+// palavra do cadastro. Acento/maiúscula já saem resolvidos pela
+// normalização em `f.norm`; sobra tratar a diferença de quantidade de
+// palavras entre o que está escrito e o que está cadastrado.
+function acharFuncionarioNoBloco(blocoNorm, funcionariosNormalizados) {
+  let melhor = null;
+  let posMaisCedo = Infinity;
+
+  funcionariosNormalizados.forEach((f) => {
+    const palavras = f.norm.split(' ');
+    const candidatos = palavras.length > 1 ? [f.norm, palavras[0]] : [f.norm];
+    candidatos.forEach((candidato) => {
+      if (!candidato) return;
+      const regex = new RegExp(`\\b${escapeRegex(candidato)}\\b`);
+      const match = regex.exec(blocoNorm);
+      if (match && match.index < posMaisCedo) {
+        posMaisCedo = match.index;
+        melhor = f;
+      }
+    });
+  });
+
+  return melhor;
+}
+
 /**
  * @param {string} texto
  * @param {{id: string, nome: string}[]} funcionariosConhecidos
@@ -111,28 +145,29 @@ export function parseDespesasCaixa(texto, funcionariosConhecidos = []) {
     if (!cabecalho) return; // não é um bloco de lançamento de verdade
     const lancamento = cabecalho[1];
 
-    // IMPORTANTE: categoria e valor vêm só da PRIMEIRA linha do bloco (a
-    // linha "RECIFE 28535 18/09/2026 ... 20,80"), nunca do bloco inteiro.
-    // Motivo: quando a Descrição de um lançamento é longa, ela quebra em
-    // várias linhas visuais no PDF, e o reagrupamento por linha (feito em
-    // pdfToText.js) faz o COMEÇO dessa descrição colar no fim do bloco
-    // ANTERIOR e o RESTO colar depois da linha de cabeçalho deste bloco.
-    // Isso faz sobrar números soltos (ex: "2,79" vindo de "DETERGENTE 2,79"
-    // dentro da descrição) que pareciam valores de despesa, e até o rodapé
-    // "Total : 1.840,20" grudando no último lançamento quando as
-    // coordenadas Y do PDF ficam próximas demais. A linha de cabeçalho,
-    // por sua vez, sempre traz Filial + Lançamento + Data + Operação +
-    // Funcionário + Centro de Custo + Valor juntos (é uma única linha
-    // visual da tabela), então é a única fonte confiável.
-    const primeiraLinha = bloco.split('\n')[0].split(/\bTotal\b/)[0];
-
-    const primeiraLinhaNorm = normalizar(primeiraLinha);
+    // CATEGORIA: olhamos as duas primeiras linhas visuais do bloco, não só a
+    // primeira. Motivo: a coluna "Conta" tem nomes compostos (ex:
+    // "ADIANTAMENTO SALARIO", "MATERIAL DE INFORMÁTICA") que às vezes não
+    // cabem numa linha só e quebram exatamente no meio ("ADIANTAMENTO" /
+    // "SALARIO DESPESA ...") — usar só a primeira linha faz a categoria
+    // sumir nesses casos. Duas linhas já cobrem esse quebra-de-coluna sem
+    // abrir mão da proteção original contra ruído de blocos vizinhos
+    // (a Descrição, essa sim pode continuar por várias linhas depois disso).
+    const duasLinhas = bloco.split('\n').slice(0, 2).join(' ').split(/\bTotal\b/)[0];
+    const duasLinhasNorm = normalizar(duasLinhas);
     const categoriaChave = CATEGORIAS_CONHECIDAS.find((c) =>
-      primeiraLinhaNorm.includes(normalizar(c))
+      duasLinhasNorm.includes(normalizar(c))
     );
     if (!categoriaChave) return; // linha de cabeçalho de tabela ou rodapé de total
 
-    const numeros = primeiraLinha.match(/[\d.]{1,},\d{2}/g) ?? [];
+    // VALOR: o último número em formato de dinheiro do BLOCO INTEIRO (não só
+    // das duas primeiras linhas) — é sempre o valor líquido já calculado,
+    // depois de qualquer desconto embutido na Descrição (ex: "MATERIAL
+    // 16,00 RESTA 24,00 -30%= 7,20", em que o valor real é 7,20, não os
+    // números intermediários da conta). O rodapé "Total : ..." já foi
+    // cortado do bloco lá em cima, então não há risco de pegar o total do
+    // relatório em vez do valor do lançamento.
+    const numeros = bloco.match(/[\d.]{1,},\d{2}/g) ?? [];
     const valor = numeros.length ? paraNumero(numeros[numeros.length - 1]) : 0;
 
     // O funcionário do caixa (quem operou o lançamento) SEMPRE aparece na
@@ -143,15 +178,7 @@ export function parseDespesasCaixa(texto, funcionariosConhecidos = []) {
     // bloco inteiro (não só a primeira linha), porque o funcionário fica
     // na MESMA linha do valor e não sofre a contaminação acima.
     const blocoNorm = normalizar(bloco);
-    let funcionarioEncontrado = null;
-    let posMaisCedo = Infinity;
-    funcionariosNormalizados.forEach((f) => {
-      const idx = blocoNorm.indexOf(f.norm);
-      if (idx !== -1 && idx < posMaisCedo) {
-        posMaisCedo = idx;
-        funcionarioEncontrado = f;
-      }
-    });
+    const funcionarioEncontrado = acharFuncionarioNoBloco(blocoNorm, funcionariosNormalizados);
 
     itens.push({
       categoria: MAPA_CATEGORIA_PADRAO[categoriaChave] ?? 'DESPESAS',

@@ -93,7 +93,7 @@ function FuncionariosTabInner({ filialId }) {
     try {
       await add({
         nome: nome.trim(),
-        comissaoPercentual: parseFloat(comissao) || 0,
+        comissaoPercentual: parseFloat(comissao) || 1,
         salarioBase: parseFloat(salarioBase) || SALARIO_MINIMO_ATUAL,
         ativo: true,
       });
@@ -268,7 +268,11 @@ function FuncionariosTabInner({ filialId }) {
 
       {error && <p className="crud-tab__error">{error}</p>}
 
-      <ImportarVendasFuncionario filialId={filialId} funcionarios={funcionarios} />
+      <ImportarVendasFuncionario
+        filialId={filialId}
+        funcionarios={funcionarios}
+        onAddFuncionario={add}
+      />
 
       <table className="crud-tab__table funcionarios-table">
         <thead>
