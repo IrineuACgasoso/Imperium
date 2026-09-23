@@ -56,6 +56,20 @@ function FuncionariosTabInner({ filialId }) {
 
   const mesAtual = mesAtualISO();
 
+  // Comissão passou a ser calculada sobre o MÊS MAIS RECENTE com venda
+  // registrada pra aquele funcionário (importada ou lançada manualmente),
+  // não mais sobre o mês-calendário real. Antes, importar o "Ranking de
+  // Vendas" de um mês fechado (ex: Agosto, importado em Setembro) fazia a
+  // comissão aparecer zerada, porque o cálculo só olhava pro mês corrente
+  // de verdade. "YYYY-MM" ordena igual string, então o maior `mes` entre os
+  // documentos do funcionário já é o mais recente — sem precisar de Date.
+  function mesReferenciaComissao(funcionarioId) {
+    const mesRef = vendasMensal
+      .filter((v) => v.funcionarioId === funcionarioId)
+      .reduce((maisRecente, v) => (v.mes > maisRecente ? v.mes : maisRecente), '');
+    return mesRef || null;
+  }
+
   async function handleAddVenda(e) {
     e.preventDefault();
     const f = funcionarios.find((x) => x.id === vendaFuncionarioId);
@@ -93,7 +107,7 @@ function FuncionariosTabInner({ filialId }) {
     try {
       await add({
         nome: nome.trim(),
-        comissaoPercentual: parseFloat(comissao) || 1,
+        comissaoPercentual: parseFloat(comissao) || 0,
         salarioBase: parseFloat(salarioBase) || SALARIO_MINIMO_ATUAL,
         ativo: true,
       });
@@ -107,8 +121,10 @@ function FuncionariosTabInner({ filialId }) {
   }
 
   function comissaoEmReais(f) {
+    const mesRef = mesReferenciaComissao(f.id);
+    if (!mesRef) return 0;
     const totalVendidoMes = vendasMensal
-      .filter((v) => v.funcionarioId === f.id && v.mes === mesAtual)
+      .filter((v) => v.funcionarioId === f.id && v.mes === mesRef)
       .reduce((sum, v) => sum + (v.totalVendido ?? 0), 0);
     return (totalVendidoMes * (f.comissaoPercentual ?? 0)) / 100;
   }
@@ -194,10 +210,11 @@ function FuncionariosTabInner({ filialId }) {
     setSelecionados([]);
   }
 
-  // "Reverter comissão" = zerar a venda do mês (que zera a comissão
-  // calculada). Fica registrado que o mês foi fechado (zeramos o documento,
-  // não apagamos), pra não sumir sem rastro. Não mexe em adiantamento nem
-  // em salário base — é só o ciclo da comissão.
+  // "Reverter comissão" = zerar a venda do mês de referência de cada
+  // funcionário (o mês mais recente com venda dele) — fica registrado que
+  // o ciclo foi fechado (zeramos o documento, não apagamos), pra não sumir
+  // sem rastro. Não mexe em adiantamento nem em salário base — é só o
+  // ciclo da comissão.
   async function handleReverterComissao() {
     const nomes = funcionarios
       .filter((f) => selecionados.includes(f.id))
@@ -205,8 +222,9 @@ function FuncionariosTabInner({ filialId }) {
       .join(', ');
     const ok = window.confirm(
       `Reverter comissão de: ${nomes}?\n\n` +
-        `Isso zera a venda do mês (${mesAtual}) usada pra calcular a comissão dessas pessoas, ` +
-        `deixando a coluna Comissão em R$ 0,00 até a próxima venda importada/lançada.\n\n` +
+        `Isso zera a venda do mês mais recente registrado de cada pessoa (a mesma base usada ` +
+        `pra calcular a comissão mostrada na tabela), deixando a coluna Comissão em R$ 0,00 até ` +
+        `a próxima venda importada/lançada.\n\n` +
         `Use isso DEPOIS de pagar a comissão do mês. Não pode ser desfeito.`
     );
     if (!ok) return;
@@ -214,12 +232,14 @@ function FuncionariosTabInner({ filialId }) {
     for (const id of selecionados) {
       const f = funcionarios.find((x) => x.id === id);
       if (!f) continue;
+      const mesRef = mesReferenciaComissao(id);
+      if (!mesRef) continue; // nada lançado ainda pra essa pessoa
       await setDoc(
-        doc(db, 'filiais', filialId, 'vendasPorFuncionarioMensal', `${id}_${mesAtual}`),
+        doc(db, 'filiais', filialId, 'vendasPorFuncionarioMensal', `${id}_${mesRef}`),
         {
           funcionarioId: id,
           funcionarioNome: f.nome,
-          mes: mesAtual,
+          mes: mesRef,
           totalVendido: 0,
           origem: 'reiniciado-apos-pagamento',
           criadoEm: serverTimestamp(),
@@ -447,8 +467,10 @@ function FuncionariosTabInner({ filialId }) {
       </form>
 
       <p className="crud-tab__note">
-        <strong>Comissão (R$)</strong> = % sobre o total vendido por esse funcionário no mês
-        atual ({mesAtual}). <strong>Total</strong> = salário base + comissão − descontos.{' '}
+        <strong>Comissão (R$)</strong> = % sobre o total vendido por esse funcionário no mês mais
+        recente com venda registrada (importada ou lançada) — não é sempre o mês-calendário atual.
+        <strong> Descontos</strong> (adiantamentos) continuam olhando o mês atual ({mesAtual}).
+        <strong> Total</strong> = salário base + comissão − descontos.{' '}
         <strong>Reverter salário</strong> apaga os adiantamentos do mês dos selecionados (use no
         dia que pagar o salário). <strong>Reverter comissão</strong> zera a venda do mês usada no
         cálculo da comissão (use no dia que pagar a comissão) — são datas diferentes, então cada

@@ -63,10 +63,19 @@ function tooltipBoxStyle() {
   };
 }
 
+const percentFormatter = new Intl.NumberFormat('pt-BR', {
+  style: 'percent',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 function FuncionarioTooltip({ active, payload, label, funcionariosById }) {
   if (!active || !payload || !payload.length) return null;
   const point = payload[0].payload;
   const entries = Object.entries(point.breakdown ?? {}).filter(([, v]) => v);
+  // % de participação de cada funcionário no total do ponto selecionado —
+  // mesma lógica de "Desempenho" do relatório "Ranking de Vendas" do CDS.
+  const total = point.value || 0;
 
   return (
     <div style={tooltipBoxStyle()}>
@@ -77,7 +86,12 @@ function FuncionarioTooltip({ active, payload, label, funcionariosById }) {
         .map(([id, value]) => (
           <div key={id} style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
             <span>{funcionariosById[id]?.nome ?? 'Funcionário'}</span>
-            <span>{fullCurrencyFormatter.format(value)}</span>
+            <span>
+              {fullCurrencyFormatter.format(value)}{' '}
+              <span style={{ color: '#b39cd4' }}>
+                ({percentFormatter.format(total > 0 ? value / total : 0)})
+              </span>
+            </span>
           </div>
         ))}
       <div

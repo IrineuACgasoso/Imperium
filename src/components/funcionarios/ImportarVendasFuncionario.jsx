@@ -6,6 +6,16 @@ import { parseRankingVendas } from '../../parsers/rankingVendas.js';
 import { normalizarNomeCliente } from '../../shared/texto.js';
 import { SALARIO_MINIMO_ATUAL, currency } from './utils.js';
 
+// "Contas" de teste do próprio CDS que às vezes aparecem no Ranking de
+// Vendas com valores residuais/virtuais (não são vendedores de verdade).
+// Bloqueadas na unha: nunca viram funcionário novo nem lançamento de venda,
+// mesmo que apareçam no PDF. Comparação por nome exato (já normalizado —
+// sem acento/maiúscula) pra não arriscar barrar sem querer alguém real cujo
+// nome só pareça com um desses (ex: "FLAVIO VIAGEM" continua passando).
+const NOMES_TESTE_IGNORADOS = new Set(
+  ['CASSIANO', 'FLÁVIO', 'CAIO', 'CASSIANO V'].map(normalizarNomeCliente)
+);
+
 // Relatório "Ranking de Vendas" do CDS: uma linha por funcionário já com o
 // nome de quem vendeu, então — diferente da importação antiga — não faz
 // mais sentido pedir pra escolher o funcionário antes de anexar o PDF.
@@ -26,16 +36,21 @@ export default function ImportarVendasFuncionario({ filialId, funcionarios, onAd
 
   if (texto && resultado === null) {
     const parsed = parseRankingVendas(texto);
-    const linhas = parsed.vendedores.map((v) => {
-      const chave = normalizarNomeCliente(v.nome);
-      const existente = funcionarios.find((f) => normalizarNomeCliente(f.nome) === chave);
-      return {
-        nome: v.nome,
-        valor: v.valor,
-        funcionarioId: existente?.id ?? null,
-      };
-    });
-    setResultado({ ...parsed, linhas });
+    const ignorados = parsed.vendedores.filter((v) =>
+      NOMES_TESTE_IGNORADOS.has(normalizarNomeCliente(v.nome))
+    ).length;
+    const linhas = parsed.vendedores
+      .filter((v) => !NOMES_TESTE_IGNORADOS.has(normalizarNomeCliente(v.nome)))
+      .map((v) => {
+        const chave = normalizarNomeCliente(v.nome);
+        const existente = funcionarios.find((f) => normalizarNomeCliente(f.nome) === chave);
+        return {
+          nome: v.nome,
+          valor: v.valor,
+          funcionarioId: existente?.id ?? null,
+        };
+      });
+    setResultado({ ...parsed, linhas, ignorados });
   }
 
   function editarValor(idx, valor) {
@@ -56,7 +71,7 @@ export default function ImportarVendasFuncionario({ filialId, funcionarios, onAd
         if (!funcionarioId) {
           const ref = await onAddFuncionario({
             nome: linha.nome,
-            comissaoPercentual: 1,
+            comissaoPercentual: 0,
             salarioBase: SALARIO_MINIMO_ATUAL,
             ativo: true,
           });
@@ -111,6 +126,12 @@ export default function ImportarVendasFuncionario({ filialId, funcionarios, onAd
           <p className="pdf-import__preview-title">
             {nomeArquivo} — mês {resultado.mes} — {resultado.linhas.length} funcionário(s)
           </p>
+          {resultado.ignorados > 0 && (
+            <p className="pdf-import__status">
+              {resultado.ignorados} nome(s) de teste do CDS ignorado(s) (CASSIANO, FLÁVIO, CAIO,
+              CASSIANO V) — não geram funcionário nem venda.
+            </p>
+          )}
           <table className="pdf-import__table pdf-import__table--rows">
             <thead>
               <tr>
