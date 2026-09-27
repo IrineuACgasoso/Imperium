@@ -1,15 +1,7 @@
-import { CATEGORIAS_GASTO } from './categoriasGasto.js';
-
-// Transforma os dados brutos do Firestore (diário, mensal histórico, gastos)
-// em séries prontas pro gráfico — no mesmo formato do mock: [{date, value}].
+// Transforma os dados brutos do Firestore (diário, mensal histórico) em
+// séries prontas pro gráfico — no mesmo formato do mock: [{date, value}].
 //
 // LIMITAÇÕES CONHECIDAS, assumidas conscientemente por ora:
-// - "Lucro" aqui é vendas − despesas do caixa diário − gastos avulsos.
-//   NÃO desconta comissão de funcionário, porque comissão só é calculável
-//   com granularidade mensal (vendasPorFuncionarioMensal), e misturar um
-//   desconto mensal dentro de uma série diária de lucro distorceria os dias
-//   individuais. Cálculo de lucro com comissão fica pra quando isso for
-//   pedido explicitamente.
 // - Histórico mensal (registrosMensaisHistoricos) só entra na série de
 //   "Vendas Totais" pra preencher meses SEM nenhum registro diário — evita
 //   contar em dobro quando ambos existem pro mesmo mês, mas mistura um
@@ -31,59 +23,8 @@ function mergeWithHistorico(dailySeries, registrosMensaisHistoricos) {
   return [...historicoPoints, ...dailySeries].sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function buildGastosPorDia(registrosDiarios, gastos) {
-  const map = new Map();
-  registrosDiarios.forEach((r) => {
-    const despesas = r.caixa?.despesas ?? 0;
-    if (despesas) map.set(r.data, (map.get(r.data) ?? 0) + despesas);
-  });
-  gastos.forEach((g) => {
-    if (g.data && g.valor) map.set(g.data, (map.get(g.data) ?? 0) + Number(g.valor));
-  });
-  return map;
-}
-
-function gastosSeries(registrosDiarios, gastos) {
-  const map = buildGastosPorDia(registrosDiarios, gastos);
-  return Array.from(map.entries())
-    .map(([date, value]) => ({ date, value }))
-    .sort((a, b) => a.date.localeCompare(b.date));
-}
-
-function lucroSeries(registrosDiarios, gastos) {
-  const gastosMap = buildGastosPorDia([], gastos); // só os avulsos aqui, despesas do caixa somamos abaixo
-  return registrosDiarios
-    .filter((r) => r.vendas)
-    .map((r) => {
-      const totalVendas = r.vendas.totalVendas ?? 0;
-      const despesasCaixa = r.caixa?.despesas ?? 0;
-      const gastosAvulsos = gastosMap.get(r.data) ?? 0;
-      return { date: r.data, value: totalVendas - despesasCaixa - gastosAvulsos };
-    })
-    .sort((a, b) => a.date.localeCompare(b.date));
-}
-
-function gastosPorCategoriaSeries(gastos, categoria) {
-  const map = new Map();
-  gastos
-    .filter((g) => (g.categoria ?? '').toUpperCase() === categoria)
-    .forEach((g) => {
-      if (!g.data) return;
-      map.set(g.data, (map.get(g.data) ?? 0) + Number(g.valor ?? 0));
-    });
-  return Array.from(map.entries())
-    .map(([date, value]) => ({ date, value }))
-    .sort((a, b) => a.date.localeCompare(b.date));
-}
-
-export function buildRealMetricSeries({ registrosDiarios, registrosMensaisHistoricos, gastos }) {
-  const porCategoria = {};
-  CATEGORIAS_GASTO.forEach((c) => {
-    porCategoria[`gastos:${c}`] = gastosPorCategoriaSeries(gastos, c);
-  });
-
+export function buildRealMetricSeries({ registrosDiarios, registrosMensaisHistoricos }) {
   return {
-    ...porCategoria,
     vendasTotais: mergeWithHistorico(
       dailyField(registrosDiarios, 'totalVendas'),
       registrosMensaisHistoricos
@@ -93,8 +34,6 @@ export function buildRealMetricSeries({ registrosDiarios, registrosMensaisHistor
     vendasBoleto: dailyField(registrosDiarios, 'boleto'),
     vendasPromissoria: dailyField(registrosDiarios, 'promissoria'),
     vendasDinheiro: dailyField(registrosDiarios, 'dinheiro'),
-    gastos: gastosSeries(registrosDiarios, gastos),
-    lucro: lucroSeries(registrosDiarios, gastos),
   };
 }
 
@@ -127,16 +66,4 @@ export function groupFuncionarioSeriesById(vendasPorFuncionarioMensal) {
 export function getDayVendasDetail(registrosDiarios, iso) {
   const registro = registrosDiarios.find((r) => r.data === iso);
   return registro ?? null;
-}
-
-/**
- * Prestação de contas de um dia específico (aba Gastos): lista os gastos
- * avulsos lançados naquele dia, mais (se houver) as despesas que vieram
- * dentro do caixa diário importado por IA.
- */
-export function getDayGastosDetail(registrosDiarios, gastos, iso) {
-  const avulsos = gastos.filter((g) => g.data === iso);
-  const registroDia = registrosDiarios.find((r) => r.data === iso);
-  const despesasCaixa = registroDia?.caixa?.despesas ?? 0;
-  return { avulsos, despesasCaixa };
 }

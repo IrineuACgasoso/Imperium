@@ -55,8 +55,6 @@ export function buildFilialDataset(filialId) {
     vendasBoleto: buildSeries(90, 120, 2, 50, s + 8),
     vendasPromissoria: buildSeries(90, 150, 2, 60, s + 4),
     vendasDinheiro: buildSeries(90, 150, 1, 50, s + 5),
-    gastos: buildSeries(90, 700, 4, 150, s + 6),
-    lucro: buildSeries(90, 500, 12, 200, s + 7),
   };
 
   const funcionarios = BASE_FUNCIONARIOS.map((f, idx) => ({ ...f }));

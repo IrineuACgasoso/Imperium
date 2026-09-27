@@ -2,11 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { doc, setDoc, updateDoc, deleteDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase.js';
 import { useFilialCollection } from '../../hooks/useFilialCollection.js';
-import { CATEGORIA_PENDENTE } from '../../data/categoriasGasto.js';
-import { salvarNaListaAuxiliar } from '../../data/listasAuxiliares.js';
 import { abreviarFormaPagamento } from '../../parsers/extratoBB.js';
-import { idVinculo, idVinculoGasto } from '../../shared/vinculo.js';
-import AssociarGastoModal from '../../shared/AssociarGastoModal.jsx';
+import { idVinculo } from '../../shared/vinculo.js';
 import {
   casarAutomatico,
   diferencaSelecao,
@@ -73,27 +70,23 @@ function PendenciasTabInner({ filialId }) {
   // em FONTES_EXTRATO) pra saber de onde veio.
   const { items: extratoCartao } = useFilialCollection(filialId, 'extratoCartao', 'data');
   const { items: clientes } = useFilialCollection(filialId, 'clientes', 'nome');
-  // Só pra saber quais débitos já foram categorizados (aba Extrato >
-  // Associar Gasto grava a categoria direto no doc `gastos/extrato_{id}`,
-  // então é ali — não numa coleção separada — que está a verdade sobre "esse
-  // débito já tem tipo de gasto ou ainda está pendente de categorizar").
-  const { items: gastos } = useFilialCollection(filialId, 'gastos', 'data');
 
   const [selVendas, setSelVendas] = useState([]);
   const [selLancamentos, setSelLancamentos] = useState([]);
   const [menuExtrato, setMenuExtrato] = useState(null);
+  const [menuCartao, setMenuCartao] = useState(null);
   const [resolvendo, setResolvendo] = useState(null);
   const [processando, setProcessando] = useState(false);
   const [aviso, setAviso] = useState(null);
   const [ordemVendasAsc, setOrdemVendasAsc] = useState(true);
   const [ordemExtratoAsc, setOrdemExtratoAsc] = useState(true);
   const [filtroDataVendas, setFiltroDataVendas] = useState('');
+  const [filtroClienteVendas, setFiltroClienteVendas] = useState('');
   const [filtroDataExtrato, setFiltroDataExtrato] = useState('');
   // Qual extrato a coluna direita está mostrando agora: 'bb' (bancário, por
   // nome) ou o id de um adquirente de cartão (por data+valor+bandeira).
   const [origemExtrato, setOrigemExtrato] = useState('bb');
   const [associandoCliente, setAssociandoCliente] = useState(null);
-  const [associandoGasto, setAssociandoGasto] = useState(null);
   const [forcandoConciliar, setForcandoConciliar] = useState(null);
   // "Lápis" no canto da tela: liga um modo de seleção paralelo (não mexe em
   // selVendas/selLancamentos, que são pra baixa manual normal) só pra marcar
@@ -155,18 +148,6 @@ function PendenciasTabInner({ filialId }) {
     return mapa;
   }, [vinculos]);
 
-  // gastos/extrato_{lancamentoId} -> doc, pra achar rapidinho a categoria (se
-  // houver) de cada débito do extrato.
-  const gastoPorLancamentoId = useMemo(() => {
-    const mapa = new Map();
-    gastos.forEach((g) => {
-      if (g.origem === 'extrato' && g.id?.startsWith('extrato_')) {
-        mapa.set(g.id.slice('extrato_'.length), g);
-      }
-    });
-    return mapa;
-  }, [gastos]);
-
   // --- Limpeza dos 7 dias -------------------------------------------------
   // Baixas fechadas há mais de uma semana somem junto com as linhas que elas
   // conciliaram. Os dados que importam (venda, registro diário, extrato) já
@@ -205,28 +186,21 @@ function PendenciasTabInner({ filialId }) {
   // facilitar a exibição e a baixa manual — filtrar, por exemplo, só Pix ou
   // só promissórias, pra conferir uma forma de cada vez. Nada marcado = nada
   // visível (estado padrão da tela).
+  const termoClienteVendas = filtroClienteVendas.trim().toLowerCase();
   const vendasAbertasBase = vendasElegiveis
     .filter((v) => formasAtivas.includes(v.forma))
-    .filter((v) => !filtroDataVendas || v.data === filtroDataVendas);
+    .filter((v) => !filtroDataVendas || v.data === filtroDataVendas)
+    .filter((v) => !termoClienteVendas || (v.clienteNome ?? '').toLowerCase().includes(termoClienteVendas));
   const vendasAbertas = [...vendasAbertasBase].sort((a, b) =>
     ordemVendasAsc ? a.data.localeCompare(b.data) : b.data.localeCompare(a.data)
   );
+  // Só créditos: gasto e cobrança de boleto nunca são baixa de venda, então
+  // nem entram nesta tela — o leitor do extrato (aba Extrato) continua
+  // guardando e mostrando esses débitos normalmente, só não aqui.
   const lancamentosAbertos = lancamentos.filter(
     (l) => !l.baixaId && !l.arquivado && l.tipo === 'credito'
   );
-  // Débitos do extrato: aparecem TODOS aqui, sem exceção — categorizado ou
-  // não. Só os categorizados (têm uma categoria de gasto de verdade, não a
-  // "A CATEGORIZAR" que entra sozinha na importação) entram na fila do
-  // Aplicar Baixas; os demais ficam visíveis, mas parados, até você associar
-  // um gasto na aba Extrato.
-  const debitosAbertos = lancamentos.filter(
-    (l) => !l.baixaId && !l.arquivado && l.tipo === 'debito'
-  );
-  // Créditos e débitos juntos, na mesma tabela — igual à disposição original
-  // do Extrato — ordenados por data. A distinção entre os dois não é mais
-  // "tabelas separadas", e sim a cor do valor (verde "+"/vermelho "-") e,
-  // nas baixas fechadas mais abaixo, a cor do card inteiro.
-  const extratoAberto = [...lancamentosAbertos, ...debitosAbertos]
+  const extratoAberto = [...lancamentosAbertos]
     .filter((l) => !filtroDataExtrato || l.data === filtroDataExtrato)
     .sort((a, b) => {
     const porData = a.data.localeCompare(b.data);
@@ -273,15 +247,9 @@ function PendenciasTabInner({ filialId }) {
     tipo = 'venda',
     colecaoLancamento = 'extratoLancamentos',
   }) {
-    const fonteLancamentos = colecaoLancamento === 'extratoCartao' ? extratoCartao : lancamentos;
-    const total =
-      tipo === 'gasto'
-        ? fonteLancamentos
-            .filter((l) => lancamentoIds.includes(l.id))
-            .reduce((s, l) => s + Number(l.valor || 0), 0)
-        : vendas
-            .filter((v) => vendaIds.includes(v.id))
-            .reduce((s, v) => s + Number(v.valor || 0), 0);
+    const total = vendas
+      .filter((v) => vendaIds.includes(v.id))
+      .reduce((s, v) => s + Number(v.valor || 0), 0);
 
     const ref = await addDoc(collection(db, 'filiais', filialId, 'baixas'), {
       vendaIds,
@@ -357,32 +325,13 @@ function PendenciasTabInner({ filialId }) {
         });
       }
 
-      // Débitos já categorizados (tipo de gasto de verdade, não "A
-      // CATEGORIZAR") se auto-baixam sozinhos — não precisam de par do lado
-      // do CDS, a categoria já é a "prova" de que aquele dinheiro tem
-      // destino conhecido. Ficam vermelhos lá embaixo, pra diferenciar de
-      // venda fechada (verde) à primeira vista.
-      const debitosCategorizados = debitosAbertos.filter((l) => {
-        const gasto = gastoPorLancamentoId.get(l.id);
-        return gasto && gasto.categoria && gasto.categoria !== CATEGORIA_PENDENTE;
-      });
-      for (const l of debitosCategorizados) {
-        await gravarBaixa({
-          vendaIds: [],
-          lancamentoIds: [l.id],
-          automatica: true,
-          tipo: 'gasto',
-        });
-      }
-
       const pendentes =
         motivos.semVinculo + motivos.semVendaCorrespondente + motivos.ambiguo;
-      const totalFechado = pares.length + debitosCategorizados.length;
       setAviso(
-        totalFechado === 0
+        pares.length === 0
           ? `Nenhuma baixa segura encontrada. ${pendentes} pagamento(s) continuam pendentes ` +
               `(${motivos.semVinculo} sem cliente associado, ${motivos.semVendaCorrespondente} sem venda de mesmo nome e valor, ${motivos.ambiguo} ambíguo(s)).`
-          : `${pares.length} venda(s) e ${debitosCategorizados.length} gasto(s) fechados automaticamente. ${pendentes} pagamento(s) de venda ficaram pendentes para conferência manual.`
+          : `${pares.length} venda(s) fechada(s) automaticamente. ${pendentes} pagamento(s) de venda ficaram pendentes para conferência manual.`
       );
     } finally {
       setProcessando(false);
@@ -458,49 +407,6 @@ function PendenciasTabInner({ filialId }) {
       criadoEm: serverTimestamp(),
     });
     setAssociandoCliente(null);
-  }
-
-  // Mesma gravação que a aba Extrato faz pra "Associar gasto" — mesmas
-  // coleções (`vinculosGastoBancarios` e `gastos/extrato_{id}`), só que
-  // disparada por aqui, pra não ter que voltar pro Extrato só pra isso.
-  async function salvarVinculoGastoPendencias(lancamento, escolha) {
-    const chave = lancamento.chaveContraparte;
-    // Mesmo fix do Extrato: sem isso o valor novo digitado aqui nunca virava
-    // sugestão pra próxima vez, só ficava gravado neste gasto.
-    if (escolha.tipoLista) {
-      await salvarNaListaAuxiliar(filialId, escolha.tipoLista, escolha.extra);
-    }
-    const vinculoDoc = {
-      chave: chave || `lancamento:${lancamento.id}`,
-      categoria: escolha.categoria,
-      ...(escolha.funcionarioId
-        ? { funcionarioId: escolha.funcionarioId, funcionarioNome: escolha.extra }
-        : {}),
-      ...(escolha.tipoLista === 'distribuidoras' ? { distribuidora: escolha.extra } : {}),
-      ...(escolha.tipoLista === 'tiposImposto' ? { tipoImposto: escolha.extra } : {}),
-      criadoEm: serverTimestamp(),
-    };
-    if (chave) {
-      await setDoc(doc(db, 'filiais', filialId, 'vinculosGastoBancarios', idVinculoGasto(chave)), vinculoDoc);
-    }
-    await setDoc(
-      doc(db, 'filiais', filialId, 'gastos', `extrato_${lancamento.id}`),
-      {
-        data: lancamento.data,
-        categoria: escolha.categoria,
-        valor: lancamento.valor,
-        descricao: lancamento.contraparteNome || lancamento.historico,
-        origem: 'extrato',
-        chaveContraparte: chave ?? '',
-        ...(escolha.funcionarioId
-          ? { funcionarioId: escolha.funcionarioId, funcionarioNome: escolha.extra }
-          : { funcionarioId: null, funcionarioNome: null }),
-        ...(escolha.tipoLista === 'distribuidoras' ? { distribuidora: escolha.extra } : { distribuidora: null }),
-        ...(escolha.tipoLista === 'tiposImposto' ? { tipoImposto: escolha.extra } : { tipoImposto: null }),
-      },
-      { merge: true }
-    );
-    setAssociandoGasto(null);
   }
 
   // --- Poda de inconsistências --------------------------------------------
@@ -595,6 +501,44 @@ function PendenciasTabInner({ filialId }) {
     }
   }
 
+  // --- Fechar sem venda (sangria / promissória de conta antiga) -----------
+  // Só "libera" o lançamento — sem cliente, sem par, sem justificativa livre
+  // — pra contas antigas que você não tem mais como controlar. Motivo fixo
+  // (não é uma poda genérica) fica gravado na baixa pra auditoria futura.
+  const LABEL_MOTIVO = { sangria: 'sangria', promissoria: 'promissória' };
+
+  async function fecharSemVenda(lancamento, motivo, colecaoLancamento = 'extratoLancamentos') {
+    const ok = window.confirm(
+      `Marcar este lançamento de ${currency.format(lancamento.valor)} (${formatarData(
+        lancamento.data
+      )}) como ${LABEL_MOTIVO[motivo]}?\n\nEle sai da fila de pendências sem precisar de uma venda associada.`
+    );
+    if (!ok) return;
+    setProcessando(true);
+    try {
+      const ref = await addDoc(collection(db, 'filiais', filialId, 'baixas'), {
+        vendaIds: [],
+        lancamentoIds: [lancamento.id],
+        automatica: false,
+        forcada: true,
+        motivo,
+        colecaoLancamento,
+        total: lancamento.valor,
+        resolucao: null,
+        tipo: 'venda',
+        fechadoEmMs: Date.now(),
+        criadoEm: serverTimestamp(),
+      });
+      await updateDoc(doc(db, 'filiais', filialId, colecaoLancamento, lancamento.id), {
+        baixaId: ref.id,
+      });
+    } finally {
+      setProcessando(false);
+      setMenuExtrato(null);
+      setMenuCartao(null);
+    }
+  }
+
 
   return (
     <div className="pend">
@@ -665,15 +609,23 @@ function PendenciasTabInner({ filialId }) {
             ? `${vendasAbertas.length} venda(s) e ${cartaoAberto.length} lançamento(s) da ${
                 FONTES_EXTRATO.find((f) => f.id === origemExtrato)?.label
               } em aberto`
-            : `${vendasAbertas.length} venda(s) e ${extratoAberto.length} lançamento(s) de extrato em ` +
-              `aberto (${lancamentosAbertos.length} pagamento(s), ${debitosAbertos.length} gasto(s))`}
+            : `${vendasAbertas.length} venda(s) e ${extratoAberto.length} lançamento(s) de extrato em aberto`}
         </span>
       </div>
 
       <div className="pend__grid">
         <section className="pend__col">
           <div className="pend__col-header">
-            <h3 className="pend__col-title">CDS — vendas</h3>
+            <div className="pend__col-header-left">
+              <h3 className="pend__col-title">CDS — vendas</h3>
+              <input
+                type="search"
+                className="pend__busca-cliente"
+                placeholder="Buscar cliente…"
+                value={filtroClienteVendas}
+                onChange={(e) => setFiltroClienteVendas(e.target.value)}
+              />
+            </div>
             <label className="pend__filtro-data pend__filtro-data--col">
               <input
                 type="date"
@@ -815,6 +767,11 @@ function PendenciasTabInner({ filialId }) {
                   key={c.id}
                   className={selLancamentos.includes(c.id) ? 'is-selected' : ''}
                   onClick={() => toggle(selLancamentos, setSelLancamentos, c.id)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setMenuCartao({ x: e.clientX, y: e.clientY, lancamento: c });
+                  }}
                 >
                   <td>{formatarData(c.data)}</td>
                   <td>{c.bandeira}</td>
@@ -857,85 +814,44 @@ function PendenciasTabInner({ filialId }) {
             </thead>
             <tbody>
               {extratoAberto.map((l) => {
-                if (l.tipo === 'credito') {
-                  const v = vinculoPorChave.get(l.chaveContraparte);
-                  return (
-                    <tr
-                      key={l.id}
-                      className={selLancamentos.includes(l.id) ? 'is-selected' : ''}
-                      onClick={() => {
-                        if (modoPoda) toggle(selPodaLancamentos, setSelPodaLancamentos, l.id);
-                        else toggle(selLancamentos, setSelLancamentos, l.id);
-                      }}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setMenuExtrato({ x: e.clientX, y: e.clientY, lancamento: l, vinculo: v });
-                      }}
-                    >
-                      {modoPoda && (
-                        <td className="pend__poda-col" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={selPodaLancamentos.includes(l.id)}
-                            onChange={() => toggle(selPodaLancamentos, setSelPodaLancamentos, l.id)}
-                          />
-                        </td>
-                      )}
-                      <td>{formatarData(l.data)}</td>
-                      <td>
-                        {l.contraparteNome || <span className="extrato__vazio">(não identificado)</span>}
-                      </td>
-                      <td className="pend__forma-col">{abreviarFormaPagamento(l.historico)}</td>
-                      <td>
-                        {v ? (
-                          <span className="extrato__cliente">{v.clienteNome}</span>
-                        ) : (
-                          <span className="extrato__vazio">sem associação</span>
-                        )}
-                      </td>
-                      <td className="extrato__num extrato__valor--credito">
-                        + {currency.format(l.valor)}
-                      </td>
-                    </tr>
-                  );
-                }
-                // Débito: nunca selecionável pra baixa manual (não pareia com
-                // venda) — só mostra se já tem categoria, pra você saber se
-                // "Aplicar Baixas" vai conseguir fechá-lo sozinho ou não.
-                // Continua fora da seleção de poda (poda é só CDS <-> crédito
-                // do extrato); mas ganha o mesmo botão direito que já existe
-                // na aba Extrato pra categorizar sem precisar sair daqui.
-                const gasto = gastoPorLancamentoId.get(l.id);
-                const categorizado = gasto && gasto.categoria && gasto.categoria !== CATEGORIA_PENDENTE;
+                const v = vinculoPorChave.get(l.chaveContraparte);
                 return (
                   <tr
                     key={l.id}
-                    className="pend__linha-gasto"
+                    className={selLancamentos.includes(l.id) ? 'is-selected' : ''}
+                    onClick={() => {
+                      if (modoPoda) toggle(selPodaLancamentos, setSelPodaLancamentos, l.id);
+                      else toggle(selLancamentos, setSelLancamentos, l.id);
+                    }}
                     onContextMenu={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      setMenuExtrato({ x: e.clientX, y: e.clientY, lancamento: l });
+                      setMenuExtrato({ x: e.clientX, y: e.clientY, lancamento: l, vinculo: v });
                     }}
                   >
-                    {modoPoda && <td className="pend__poda-col" />}
+                    {modoPoda && (
+                      <td className="pend__poda-col" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selPodaLancamentos.includes(l.id)}
+                          onChange={() => toggle(selPodaLancamentos, setSelPodaLancamentos, l.id)}
+                        />
+                      </td>
+                    )}
                     <td>{formatarData(l.data)}</td>
-                    <td>{l.contraparteNome || l.historico}</td>
+                    <td>
+                      {l.contraparteNome || <span className="extrato__vazio">(não identificado)</span>}
+                    </td>
                     <td className="pend__forma-col">{abreviarFormaPagamento(l.historico)}</td>
                     <td>
-                      {categorizado ? (
-                        <span className="pend__categoria-ok">
-                          {gasto.categoria}
-                          {gasto.funcionarioNome || gasto.distribuidora || gasto.tipoImposto
-                            ? ` · ${gasto.funcionarioNome ?? gasto.distribuidora ?? gasto.tipoImposto}`
-                            : ''}
-                        </span>
+                      {v ? (
+                        <span className="extrato__cliente">{v.clienteNome}</span>
                       ) : (
-                        <span className="extrato__vazio">a categorizar (botão direito aqui)</span>
+                        <span className="extrato__vazio">sem associação</span>
                       )}
                     </td>
-                    <td className="extrato__num extrato__valor--debito">
-                      - {currency.format(l.valor)}
+                    <td className="extrato__num extrato__valor--credito">
+                      + {currency.format(l.valor)}
                     </td>
                   </tr>
                 );
@@ -1037,9 +953,9 @@ function PendenciasTabInner({ filialId }) {
         sem cliente, nome parecido mas diferente, um centavo de diferença, duas vendas candidatas
         — fica pendente de propósito, para você fechar na mão. Pagamento parcial, vários Pix
         para uma venda ou um Pix para várias vendas: selecione as linhas dos dois lados e use
-        "Dar baixa na seleção". Gastos (débitos do extrato) fecham sozinhos assim que têm uma
-        categoria associada — não precisam de par do lado do CDS. O histórico de baixas
-        conciliadas (e a opção de restaurar) ficou na aba Fechamentos.
+        "Dar baixa na seleção". Gastos e cobrança de boletos não aparecem mais aqui — essa tela
+        é só para baixa de venda; para categorizar um débito, use a aba Extrato. O histórico de
+        baixas conciliadas (e a opção de restaurar) ficou na aba Fechamentos.
       </p>
 
       {resolvendo && (
@@ -1055,27 +971,40 @@ function PendenciasTabInner({ filialId }) {
           x={menuExtrato.x}
           y={menuExtrato.y}
           onClose={() => setMenuExtrato(null)}
-          itens={
-            menuExtrato.lancamento.tipo === 'credito'
-              ? [
-                  {
-                    label: 'Associar cliente',
-                    desabilitado: !menuExtrato.lancamento.chaveContraparte,
-                    onClick: () => setAssociandoCliente(menuExtrato.lancamento),
-                  },
-                  {
-                    label: 'Forçar Conciliar',
-                    desabilitado: !menuExtrato.vinculo,
-                    onClick: () => setForcandoConciliar(menuExtrato.lancamento),
-                  },
-                ]
-              : [
-                  {
-                    label: 'Associar gasto',
-                    onClick: () => setAssociandoGasto(menuExtrato.lancamento),
-                  },
-                ]
-          }
+          itens={[
+            {
+              label: 'Associar cliente',
+              desabilitado: !menuExtrato.lancamento.chaveContraparte,
+              onClick: () => setAssociandoCliente(menuExtrato.lancamento),
+            },
+            {
+              label: 'Forçar Conciliar',
+              desabilitado: !menuExtrato.vinculo,
+              onClick: () => setForcandoConciliar(menuExtrato.lancamento),
+            },
+            {
+              label: 'Associar sangria',
+              onClick: () => fecharSemVenda(menuExtrato.lancamento, 'sangria'),
+            },
+            {
+              label: 'Associar promissória',
+              onClick: () => fecharSemVenda(menuExtrato.lancamento, 'promissoria'),
+            },
+          ]}
+        />
+      )}
+
+      {menuCartao && (
+        <ContextMenu
+          x={menuCartao.x}
+          y={menuCartao.y}
+          onClose={() => setMenuCartao(null)}
+          itens={[
+            {
+              label: 'Associar promissória',
+              onClick: () => fecharSemVenda(menuCartao.lancamento, 'promissoria', 'extratoCartao'),
+            },
+          ]}
         />
       )}
 
@@ -1095,16 +1024,6 @@ function PendenciasTabInner({ filialId }) {
           onCancel={() => setForcandoConciliar(null)}
           onConfirm={(justificativa) => confirmarForcarConciliar(forcandoConciliar, justificativa)}
           processando={processando}
-        />
-      )}
-
-      {associandoGasto && (
-        <AssociarGastoModal
-          filialId={filialId}
-          lancamento={associandoGasto}
-          vinculoAtual={undefined}
-          onCancel={() => setAssociandoGasto(null)}
-          onConfirm={(escolha) => salvarVinculoGastoPendencias(associandoGasto, escolha)}
         />
       )}
 

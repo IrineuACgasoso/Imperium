@@ -1,5 +1,11 @@
 export const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
+export function hojeISO() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 export const BANCOS = [
   {
     id: 'bb',

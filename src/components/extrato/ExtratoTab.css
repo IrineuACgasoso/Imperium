@@ -63,6 +63,16 @@
   flex-wrap: wrap;
 }
 
+.extrato__toolbar--export {
+  padding-top: 10px;
+  border-top: 1px solid rgba(242, 233, 251, 0.08);
+}
+
+.extrato__label-export {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .extrato__busca {
   flex: 1;
   min-width: 240px;

@@ -15,7 +15,6 @@ import {
 import { doc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import PeriodSelector from '../common/PeriodSelector.jsx';
 import MetricPills, { METRIC_ITEMS } from '../common/MetricPills.jsx';
-import { OPCOES_GRAFICO_GASTOS, GASTOS_TODOS_KEY } from '../../data/categoriasGasto.js';
 import DayDetailPanel from '../common/DayDetailPanel.jsx';
 import { buildFilialDataset } from '../../data/mockData.js';
 import { buildPeriodSeries, buildBreakdownPeriodSeries } from '../../data/periodBuckets.js';
@@ -23,7 +22,6 @@ import {
   buildRealMetricSeries,
   groupFuncionarioSeriesById,
   getDayVendasDetail,
-  getDayGastosDetail,
 } from '../../data/realAggregation.js';
 import { useRealFilialData } from '../../hooks/useRealFilialData.js';
 import { db, firebaseIsConfigured } from '../../config/firebase.js';
@@ -43,13 +41,11 @@ const fullCurrencyFormatter = new Intl.NumberFormat('pt-BR', {
 
 const MODE_TITLES = {
   vendas: 'Vendas',
-  gastos: 'Gastos',
   funcionarios: 'Vendas por funcionário',
 };
 
 const DEFAULT_METRIC_BY_MODE = {
   vendas: 'vendasTotais',
-  gastos: GASTOS_TODOS_KEY,
 };
 
 function tooltipBoxStyle() {
@@ -137,12 +133,12 @@ export default function PerformanceChart({ filialId, mode }) {
   const metricSeries = useMemo(
     () => (firebaseIsConfigured ? buildRealMetricSeries(real) : mock.metricSeries),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [firebaseIsConfigured, mock, real.registrosDiarios, real.registrosMensaisHistoricos, real.gastos]
+    [firebaseIsConfigured, mock, real.registrosDiarios, real.registrosMensaisHistoricos]
   );
 
   // O gráfico principal segue a aba ativa da barra lateral; o seletor de
   // métrica (pills) só some quando o modo muda, sempre voltando pro
-  // "padrão" daquela aba (Totais em vendas, Gastos em gastos).
+  // "padrão" daquela aba (Totais em vendas).
   useEffect(() => {
     setMetricKey(DEFAULT_METRIC_BY_MODE[mode] ?? 'vendasTotais');
     setSelectedDayIso(null);
@@ -197,9 +193,8 @@ export default function PerformanceChart({ filialId, mode }) {
     return buildPeriodSeries(metricSeries[metricKey] ?? [], period, customRange);
   }, [isFuncionariosMode, funcionarioRawSeries, metricSeries, metricKey, period, customRange]);
 
-  // Em Gastos o seletor lista as CATEGORIAS de gasto; em Vendas, as formas
-  // de pagamento/lucro.
-  const opcoesSeletor = mode === 'gastos' ? OPCOES_GRAFICO_GASTOS : METRIC_ITEMS;
+  // Em Vendas o seletor lista as formas de pagamento/período.
+  const opcoesSeletor = METRIC_ITEMS;
   const activeMetric = opcoesSeletor.find((i) => i.key === metricKey);
   const headerTitle = isFuncionariosMode ? MODE_TITLES.funcionarios : activeMetric?.label ?? MODE_TITLES[mode];
 
@@ -222,8 +217,8 @@ export default function PerformanceChart({ filialId, mode }) {
     if (point?.iso) setSelectedDayIso((cur) => (cur === point.iso ? null : point.iso));
   }
 
-  // --- Detalhe do dia (só faz sentido pra vendas/gastos, e só quando o
-  // ponto clicado representa um único dia — semana/mês/personalizado). ---
+  // --- Detalhe do dia (só faz sentido pra vendas, e só quando o ponto
+  // clicado representa um único dia — semana/mês/personalizado). ---
   const vendasDetailForDay = useMemo(() => {
     if (!selectedDayIso || isFuncionariosMode) return null;
     if (firebaseIsConfigured) return getDayVendasDetail(real.registrosDiarios, selectedDayIso);
@@ -242,21 +237,6 @@ export default function PerformanceChart({ filialId, mode }) {
     return houveVenda ? { vendas, origem: 'manual' } : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDayIso, isFuncionariosMode, firebaseIsConfigured, real.registrosDiarios, mock]);
-
-  const gastosDetailForDay = useMemo(() => {
-    if (!selectedDayIso || isFuncionariosMode) return null;
-    if (firebaseIsConfigured) {
-      return getDayGastosDetail(real.registrosDiarios, real.gastos, selectedDayIso);
-    }
-    const valor = mock.metricSeries.gastos?.find((p) => p.date === selectedDayIso)?.value ?? 0;
-    return {
-      avulsos: valor
-        ? [{ id: 'mock', categoria: 'Gastos do dia (exemplo)', valor, descricao: '' }]
-        : [],
-      despesasCaixa: 0,
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDayIso, isFuncionariosMode, firebaseIsConfigured, real.registrosDiarios, real.gastos, mock]);
 
   async function handleDeleteVendaDoDia() {
     if (!firebaseIsConfigured || !selectedDayIso) return;
@@ -278,11 +258,6 @@ export default function PerformanceChart({ filialId, mode }) {
       origem: 'manual',
       criadoEm: serverTimestamp(),
     });
-  }
-
-  async function handleDeleteGastoDoDia(gastoId) {
-    if (!firebaseIsConfigured) return;
-    await deleteDoc(doc(db, 'filiais', filialId, 'gastos', gastoId));
   }
 
   // Esc fecha a prestação de contas do dia, igual ao botão "✕".
@@ -419,7 +394,6 @@ export default function PerformanceChart({ filialId, mode }) {
             iso={selectedDayIso}
             kind={mode}
             vendasDetail={vendasDetailForDay}
-            gastosDetail={gastosDetailForDay}
             onClose={() => setSelectedDayIso(null)}
             onDeleteVenda={
               mode === 'vendas' && firebaseIsConfigured && vendasDetailForDay
@@ -431,7 +405,6 @@ export default function PerformanceChart({ filialId, mode }) {
                 ? handleSaveVendaDoDia
                 : null
             }
-            onDeleteGasto={mode === 'gastos' && firebaseIsConfigured ? handleDeleteGastoDoDia : null}
           />
         </div>
       )}
@@ -445,7 +418,7 @@ export default function PerformanceChart({ filialId, mode }) {
           {chartType === 'line' ? '◔ Pizza' : '⟋ Linha'}
         </button>
 
-        {!isFuncionariosMode && (mode === 'vendas' || mode === 'gastos') && (
+        {!isFuncionariosMode && mode === 'vendas' && (
           <MetricPills activeKey={metricKey} onSelect={setMetricKey} items={opcoesSeletor} />
         )}
       </footer>

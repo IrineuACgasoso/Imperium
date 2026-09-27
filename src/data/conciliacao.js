@@ -123,20 +123,3 @@ export function baixaExpirada(baixa, agora = Date.now()) {
   if (!ms) return false;
   return agora - ms > DIAS_RETENCAO_BAIXAS * 24 * 60 * 60 * 1000;
 }
-
-/**
- * Baixa automática do lado dos GASTOS (débitos do extrato).
- *
- * Aqui não existe ambiguidade de nome/valor como do lado das vendas — a
- * única pergunta é "esse pagamento já foi categorizado?". Se a conta que
- * recebeu o débito já tem um vínculo de gasto (categoria + referência,
- * criado manualmente uma vez via "Associar Gasto"), o lançamento pode ser
- * fechado sozinho a cada nova importação. Sem vínculo, fica pendente — a
- * automação nunca inventa uma categoria.
- */
-export function casarGastosAutomatico(lancamentosDebito, vinculosGasto) {
-  const fechaveis = lancamentosDebito.filter(
-    (l) => l.tipo === 'debito' && !l.baixaId && l.chaveContraparte && vinculosGasto.get(l.chaveContraparte)
-  );
-  return fechaveis.map((l) => ({ lancamento: l, vinculo: vinculosGasto.get(l.chaveContraparte) }));
-}

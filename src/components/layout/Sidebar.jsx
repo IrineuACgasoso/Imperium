@@ -5,7 +5,6 @@ const NAV_ITEMS = [
   { id: 'vendas', label: 'Vendas' },
   { id: 'funcionarios', label: 'Funcionários' },
   { id: 'clientes', label: 'Clientes' },
-  { id: 'gastos', label: 'Gastos' },
   { id: 'pendencias', label: 'Pendências' },
   { id: 'fechamentos', label: 'Fechamentos' },
   { id: 'extrato', label: 'Extrato' },

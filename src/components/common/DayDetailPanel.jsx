@@ -21,11 +21,9 @@ export default function DayDetailPanel({
   iso,
   kind,
   vendasDetail,
-  gastosDetail,
   onClose,
   onDeleteVenda,
   onSaveVenda,
-  onDeleteGasto,
 }) {
   const [editing, setEditing] = useState(false);
   const [editValues, setEditValues] = useState(null);
@@ -133,51 +131,6 @@ export default function DayDetailPanel({
         </>
       )}
 
-      {kind === 'gastos' && (
-        <>
-          {gastosDetail && (gastosDetail.avulsos.length > 0 || gastosDetail.despesasCaixa > 0) ? (
-            <>
-              <ul className="day-detail__list">
-                {gastosDetail.avulsos.map((g) => (
-                  <li key={g.id} className="day-detail__list-item">
-                    <div>
-                      <span className="day-detail__item-label">{g.categoria}</span>
-                      {g.descricao && <span className="day-detail__list-desc"> — {g.descricao}</span>}
-                    </div>
-                    <div className="day-detail__list-actions">
-                      <span className="day-detail__item-value">{currency.format(Number(g.valor))}</span>
-                      {onDeleteGasto && (
-                        <button className="day-detail__delete-inline" onClick={() => onDeleteGasto(g.id)}>
-                          Remover
-                        </button>
-                      )}
-                    </div>
-                  </li>
-                ))}
-                {gastosDetail.despesasCaixa > 0 && (
-                  <li className="day-detail__list-item">
-                    <span className="day-detail__item-label">Despesas do caixa (IA)</span>
-                    <span className="day-detail__item-value">
-                      {currency.format(gastosDetail.despesasCaixa)}
-                    </span>
-                  </li>
-                )}
-              </ul>
-              <div className="day-detail__total">
-                <span>Total do dia</span>
-                <strong>
-                  {currency.format(
-                    gastosDetail.avulsos.reduce((sum, g) => sum + Number(g.valor), 0) +
-                      gastosDetail.despesasCaixa
-                  )}
-                </strong>
-              </div>
-            </>
-          ) : (
-            <p className="day-detail__empty">Nenhum gasto lançado para este dia.</p>
-          )}
-        </>
-      )}
     </div>
   );
 }

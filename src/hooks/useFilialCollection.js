@@ -20,10 +20,10 @@ import { db, firebaseIsConfigured } from '../config/firebase.js';
  * --- Por que existe um cache aqui -----------------------------------------
  * Antes, cada componente que chamava este hook abria seu PRÓPRIO listener do
  * Firestore. Como várias abas pedem a mesma coleção (ex: `extratoLancamentos`
- * é lido por Pendências, Extrato e Clientes; `gastos` por Pendências e
- * Gastos), navegar entre abas destruía e recriava listeners o tempo todo —
- * cada remontagem custava uma leitura completa da coleção de novo, mesmo sem
- * nada ter mudado. Isso é o que estava consumindo cota rápido demais.
+ * é lido por Pendências, Extrato e Clientes), navegar entre abas destruía e
+ * recriava listeners o tempo todo — cada remontagem custava uma leitura
+ * completa da coleção de novo, mesmo sem nada ter mudado. Isso é o que
+ * estava consumindo cota rápido demais.
  *
  * Agora existe UM listener por (filialId, subcollection, orderByField),
  * compartilhado por quantos componentes quiserem os mesmos dados ao mesmo

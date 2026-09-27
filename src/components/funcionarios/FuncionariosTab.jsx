@@ -25,7 +25,13 @@ function FuncionariosTabInner({ filialId }) {
     'nome'
   );
   const { items: vendasMensal } = useFilialCollection(filialId, 'vendasPorFuncionarioMensal');
-  const { items: gastos } = useFilialCollection(filialId, 'gastos');
+  // Adiantamento de salário: lançamento manual, independente de qualquer
+  // extrato ou categoria de gasto (a aba/feature de Gastos não existe mais).
+  const { items: adiantamentos, add: addAdiantamento } = useFilialCollection(
+    filialId,
+    'adiantamentos',
+    'data'
+  );
 
   const [error, setError] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -39,11 +45,18 @@ function FuncionariosTabInner({ filialId }) {
   const [vendaTotal, setVendaTotal] = useState('');
   const formVendaRef = useRef(null);
 
-  // --- Cadastro de FUNCIONÁRIO (formulário secundário, embaixo da lista) ---
+  // --- Cadastro secundário: novos funcionários (menos frequente). ---
   const [nome, setNome] = useState('');
   const [comissao, setComissao] = useState('');
   const [salarioBase, setSalarioBase] = useState('');
   const formFuncRef = useRef(null);
+
+  // --- Adiantamento de salário (lançamento manual) ---
+  const [adiantFuncionario, setAdiantFuncionario] = useState('');
+  const [adiantFuncionarioId, setAdiantFuncionarioId] = useState('');
+  const [adiantData, setAdiantData] = useState('');
+  const [adiantValor, setAdiantValor] = useState('');
+  const formAdiantRef = useRef(null);
 
   // Funcionários cadastrados antes do campo `salarioBase` existir são
   // preenchidos automaticamente com o mínimo atual, de verdade no Firestore.
@@ -120,6 +133,32 @@ function FuncionariosTabInner({ filialId }) {
     }
   }
 
+  async function handleAddAdiantamento(e) {
+    e.preventDefault();
+    const f = funcionarios.find((x) => x.id === adiantFuncionarioId);
+    if (!f) {
+      setError('Escolha um funcionário da lista.');
+      return;
+    }
+    if (!adiantData || !adiantValor) {
+      setError('Preencha a data e o valor do adiantamento.');
+      return;
+    }
+    setError(null);
+    await addAdiantamento({
+      funcionarioId: f.id,
+      funcionarioNome: f.nome,
+      data: adiantData,
+      valor: parseFloat(adiantValor) || 0,
+    });
+    setAdiantFuncionario('');
+    setAdiantFuncionarioId('');
+    setAdiantValor('');
+    // A data é mantida de propósito: o normal é lançar vários adiantamentos
+    // do mesmo dia seguidos, um por funcionário.
+    focusFirstField(formAdiantRef);
+  }
+
   function comissaoEmReais(f) {
     const mesRef = mesReferenciaComissao(f.id);
     if (!mesRef) return 0;
@@ -130,14 +169,9 @@ function FuncionariosTabInner({ filialId }) {
   }
 
   function descontosDoMes(f) {
-    return gastos
-      .filter(
-        (g) =>
-          g.categoria === 'ADIANTAMENTO SALÁRIO' &&
-          g.funcionarioId === f.id &&
-          g.data?.slice(0, 7) === mesAtual
-      )
-      .reduce((sum, g) => sum + (Number(g.valor) || 0), 0);
+    return adiantamentos
+      .filter((a) => a.funcionarioId === f.id && a.data?.slice(0, 7) === mesAtual)
+      .reduce((sum, a) => sum + (Number(a.valor) || 0), 0);
   }
 
   function startEdit(f) {
@@ -197,14 +231,11 @@ function FuncionariosTabInner({ filialId }) {
     if (!ok) return;
 
     for (const id of selecionados) {
-      const adiantamentos = gastos.filter(
-        (g) =>
-          g.categoria === 'ADIANTAMENTO SALÁRIO' &&
-          g.funcionarioId === id &&
-          g.data?.slice(0, 7) === mesAtual
+      const adiantamentosDoMes = adiantamentos.filter(
+        (a) => a.funcionarioId === id && a.data?.slice(0, 7) === mesAtual
       );
-      for (const g of adiantamentos) {
-        await deleteDoc(doc(db, 'filiais', filialId, 'gastos', g.id));
+      for (const a of adiantamentosDoMes) {
+        await deleteDoc(doc(db, 'filiais', filialId, 'adiantamentos', a.id));
       }
     }
     setSelecionados([]);
@@ -436,6 +467,45 @@ function FuncionariosTabInner({ filialId }) {
           </button>
         </div>
       )}
+
+      {/* Adiantamento de salário: lançamento manual, sem depender de gasto/extrato. */}
+      <form
+        className="crud-tab__form crud-tab__form--secondary"
+        onSubmit={handleAddAdiantamento}
+        ref={formAdiantRef}
+      >
+        <span className="crud-tab__form-label">Lançar adiantamento</span>
+        <Combobox
+          value={adiantFuncionario}
+          onChange={(v, option) => {
+            setAdiantFuncionario(v);
+            const f =
+              funcionarios.find((x) => x.id === option?.id) ??
+              funcionarios.find((x) => x.nome.toLowerCase() === v.trim().toLowerCase());
+            setAdiantFuncionarioId(f?.id ?? '');
+          }}
+          options={funcionarios.map((f) => ({ value: f.nome, label: f.nome, id: f.id }))}
+          placeholder="Funcionário"
+          allowFree={false}
+          minWidth={200}
+        />
+        <input
+          type="date"
+          aria-label="Data do adiantamento"
+          value={adiantData}
+          onChange={(e) => setAdiantData(e.target.value)}
+          onKeyDown={handleEnterNavigation}
+        />
+        <input
+          type="number"
+          step="0.01"
+          placeholder="Valor"
+          value={adiantValor}
+          onChange={(e) => setAdiantValor(e.target.value)}
+          onKeyDown={handleEnterNavigation}
+        />
+        <button type="submit">Lançar adiantamento</button>
+      </form>
 
       {/* Cadastro secundário: novos funcionários (menos frequente). */}
       <form className="crud-tab__form crud-tab__form--secondary" onSubmit={handleAddFuncionario} ref={formFuncRef}>

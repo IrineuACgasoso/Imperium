@@ -4,7 +4,6 @@ import { signOut } from 'firebase/auth';
 import Sidebar from '../layout/Sidebar.jsx';
 import PerformanceChart from './PerformanceChart.jsx';
 import FuncionariosTab from '../funcionarios/FuncionariosTab.jsx';
-import GastosTab from '../gastos/GastosTab.jsx';
 import ClientesTab from '../clientes/ClientesTab.jsx';
 import VendasTab from '../vendas/VendasTab.jsx';
 import PendenciasTab from '../pendencias/PendenciasTab.jsx';
@@ -17,7 +16,6 @@ const TAB_LABELS = {
   vendas: 'Vendas',
   funcionarios: 'Funcionários',
   clientes: 'Clientes',
-  gastos: 'Gastos',
   pendencias: 'Pendências',
   fechamentos: 'Fechamentos',
   extrato: 'Extrato',
@@ -25,7 +23,7 @@ const TAB_LABELS = {
 
 const MOCK_FILIAIS = [{ id: 'recife-matriz', nome: 'Recife — Matriz' }];
 
-const CHART_MODES = ['vendas', 'funcionarios', 'gastos'];
+const CHART_MODES = ['vendas', 'funcionarios'];
 // "clientes", "pendencias" e "extrato" não alimentam o gráfico principal:
 // clientes tem o gráfico próprio dentro da aba, e os outros dois são telas
 // de conferência. Nessas abas o gráfico do topo permanece no que estava.
@@ -33,7 +31,7 @@ const CHART_MODES = ['vendas', 'funcionarios', 'gastos'];
 export default function Dashboard({ onLogout }) {
   const [activeTab, setActiveTab] = useState(null);
   // O gráfico principal sempre reflete a última aba "de dados" visitada
-  // (vendas/funcionários/gastos). A aba "Importar dados (IA)" não tem
+  // (vendas/funcionários). A aba "Importar dados (IA)" não tem
   // gráfico próprio, então não mexe nisso — o gráfico permanece no que
   // estava antes de abrir a importação.
   const [chartMode, setChartMode] = useState('vendas');
@@ -108,7 +106,6 @@ export default function Dashboard({ onLogout }) {
             {activeTab === 'vendas' && <VendasTab filialId={activeFilialId} />}
             {activeTab === 'funcionarios' && <FuncionariosTab filialId={activeFilialId} />}
             {activeTab === 'clientes' && <ClientesTab filialId={activeFilialId} />}
-            {activeTab === 'gastos' && <GastosTab filialId={activeFilialId} />}
             {activeTab === 'pendencias' && <PendenciasTab filialId={activeFilialId} />}
             {activeTab === 'fechamentos' && <FechamentosTab filialId={activeFilialId} />}
             {/* key={activeFilialId} zera o desbloqueio de senha ao trocar de

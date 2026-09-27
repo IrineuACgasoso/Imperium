@@ -3,7 +3,6 @@ import './MetricPills.css';
 
 export const METRIC_ITEMS = [
   { key: 'vendasTotais', label: 'Totais' },
-  { key: 'lucro', label: 'Lucro' },
   { key: 'vendasPix', label: 'Pix' },
   { key: 'vendasCartao', label: 'Cartão' },
   { key: 'vendasBoleto', label: 'Boleto' },
@@ -13,8 +12,8 @@ export const METRIC_ITEMS = [
 
 // Seletor de métrica colapsado num único dropdown (pra não ocupar uma fileira
 // inteira de botões). Fecha ao clicar fora ou ao escolher uma opção.
-// `items` permite trocar a lista conforme a aba: em Vendas são as formas de
-// pagamento; em Gastos são as categorias de gasto.
+// `items` permite trocar a lista conforme a aba: hoje só Vendas usa isto
+// (formas de pagamento).
 export default function MetricPills({ activeKey, onSelect, items = METRIC_ITEMS }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);

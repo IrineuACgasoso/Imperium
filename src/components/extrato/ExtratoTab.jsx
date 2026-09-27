@@ -5,16 +5,14 @@ import { useFilialCollection } from '../../hooks/useFilialCollection.js';
 import { extrairTextoPdf } from '../../parsers/pdfToText.js';
 import { parseExtratoBB } from '../../parsers/extratoBB.js';
 import { parseExtratoRede } from '../../parsers/extratoRede.js';
-import { CATEGORIA_PENDENTE } from '../../data/categoriasGasto.js';
-import { salvarNaListaAuxiliar } from '../../data/listasAuxiliares.js';
 import FirebaseGate from '../layout/FirebaseGate.jsx';
 import ContextMenu from '../common/ContextMenu.jsx';
 import Combobox from '../common/Combobox.jsx';
-import CategoriaGastoPicker from '../common/CategoriaGastoPicker.jsx';
-import { idVinculo, idVinculoGasto } from '../../shared/vinculo.js';
-import AssociarGastoModal from '../../shared/AssociarGastoModal.jsx';
+import { idVinculo } from '../../shared/vinculo.js';
+import { montarLinhasExtrato } from '../../data/extratoExport.js';
+import { gerarExcelExtrato } from '../../data/gerarExcelExtrato.js';
 import AssociarClienteModal from './AssociarClienteModal.jsx';
-import { currency, BANCOS, formatarData, formatarDocumento } from './utils.js';
+import { currency, BANCOS, formatarData, formatarDocumento, hojeISO } from './utils.js';
 import '../../shared/CrudTab.css';
 import '../../shared/PdfImport.css';
 import './ExtratoTab.css';
@@ -65,7 +63,6 @@ function ExtratoTabInner({ filialId }) {
 function ExtratoBB({ filialId }) {
   const { items: lancamentos } = useFilialCollection(filialId, 'extratoLancamentos', 'data');
   const { items: vinculos } = useFilialCollection(filialId, 'vinculosBancarios', 'criadoEm');
-  const { items: vinculosGasto } = useFilialCollection(filialId, 'vinculosGastoBancarios', 'criadoEm');
   const { items: clientes } = useFilialCollection(filialId, 'clientes', 'nome');
 
   const [previa, setPrevia] = useState(null);
@@ -74,8 +71,10 @@ function ExtratoBB({ filialId }) {
   const [salvando, setSalvando] = useState(false);
   const [menu, setMenu] = useState(null);
   const [associandoCliente, setAssociandoCliente] = useState(null);
-  const [associandoGasto, setAssociandoGasto] = useState(null);
   const [filtro, setFiltro] = useState('');
+  const [exportando, setExportando] = useState(false);
+  const [exportInicio, setExportInicio] = useState('');
+  const [exportFim, setExportFim] = useState(() => hojeISO());
 
   const vinculoPorChave = useMemo(() => {
     const mapa = new Map();
@@ -83,11 +82,22 @@ function ExtratoBB({ filialId }) {
     return mapa;
   }, [vinculos]);
 
-  const vinculoGastoPorChave = useMemo(() => {
-    const mapa = new Map();
-    vinculosGasto.forEach((v) => mapa.set(v.chave, v));
-    return mapa;
-  }, [vinculosGasto]);
+  async function handleExportar() {
+    if (!exportInicio || !exportFim) {
+      setErro('Escolha a data inicial e final do intervalo a exportar.');
+      return;
+    }
+    setExportando(true);
+    setErro(null);
+    try {
+      const linhas = montarLinhasExtrato(lancamentos, exportInicio, exportFim);
+      await gerarExcelExtrato(linhas, `extrato-bb_${exportInicio}_a_${exportFim}.xlsx`);
+    } catch (err) {
+      setErro(err.message);
+    } finally {
+      setExportando(false);
+    }
+  }
 
   async function lerArquivo(file) {
     const ext = file.name.toLowerCase().split('.').pop();
@@ -134,39 +144,14 @@ function ExtratoBB({ filialId }) {
     try {
       for (const l of previa.lancamentos) {
         // merge: se o lançamento já existe e já foi conciliado, reimportar o
-        // extrato não pode desfazer a baixa nem apagar o vínculo.
+        // extrato não pode desfazer a baixa nem apagar o vínculo. Débitos só
+        // ficam salvos aqui, como extrato bruto — não existe mais
+        // categorização de gasto no sistema.
         await setDoc(
           doc(db, 'filiais', filialId, 'extratoLancamentos', l.id),
           { ...l, importadoEm: serverTimestamp(), criadoEm: serverTimestamp() },
           { merge: true }
         );
-
-        // Todo débito do extrato é, por definição, um gasto — sem exceção.
-        // Ele entra na aba Gastos (e no gráfico) na hora, categorizado se já
-        // existir um vínculo pra essa conta (de uma associação anterior) ou
-        // com a categoria "A CATEGORIZAR" até você associar pelo botão
-        // direito. `merge: true` preserva a categoria caso você já tenha
-        // associado esse mesmo lançamento antes de reimportar o extrato.
-        if (l.tipo === 'debito') {
-          const vinculoGasto = l.chaveContraparte ? vinculoGastoPorChave.get(l.chaveContraparte) : null;
-          await setDoc(
-            doc(db, 'filiais', filialId, 'gastos', `extrato_${l.id}`),
-            {
-              data: l.data,
-              categoria: vinculoGasto?.categoria ?? CATEGORIA_PENDENTE,
-              valor: l.valor,
-              descricao: l.contraparteNome || l.historico,
-              origem: 'extrato',
-              chaveContraparte: l.chaveContraparte ?? '',
-              ...(vinculoGasto?.funcionarioId
-                ? { funcionarioId: vinculoGasto.funcionarioId, funcionarioNome: vinculoGasto.funcionarioNome }
-                : {}),
-              ...(vinculoGasto?.distribuidora ? { distribuidora: vinculoGasto.distribuidora } : {}),
-              ...(vinculoGasto?.tipoImposto ? { tipoImposto: vinculoGasto.tipoImposto } : {}),
-            },
-            { merge: true }
-          );
-        }
       }
       setPrevia(null);
     } catch (err) {
@@ -200,50 +185,6 @@ function ExtratoBB({ filialId }) {
       `Desassociar esta conta de "${v.clienteNome}"?\n\nOs pagamentos dessa conta voltam a ficar sem cliente e não serão mais conciliados automaticamente.`
     );
     if (ok) await deleteDoc(doc(db, 'filiais', filialId, 'vinculosBancarios', idVinculo(chave)));
-  }
-
-  async function salvarVinculoGasto(lancamento, escolha) {
-    const chave = lancamento.chaveContraparte;
-    // Sem isso, um valor novo digitado aqui (ex: uma distribuidora que
-    // ainda não existia) nunca aparecia de novo no autocomplete — só ficava
-    // gravado neste gasto específico, e não na lista de sugestões.
-    if (escolha.tipoLista) {
-      await salvarNaListaAuxiliar(filialId, escolha.tipoLista, escolha.extra);
-    }
-    const vinculoDoc = {
-      chave: chave || `lancamento:${lancamento.id}`,
-      categoria: escolha.categoria,
-      ...(escolha.funcionarioId
-        ? { funcionarioId: escolha.funcionarioId, funcionarioNome: escolha.extra }
-        : {}),
-      ...(escolha.tipoLista === 'distribuidoras' ? { distribuidora: escolha.extra } : {}),
-      ...(escolha.tipoLista === 'tiposImposto' ? { tipoImposto: escolha.extra } : {}),
-      criadoEm: serverTimestamp(),
-    };
-    // Sem chave de contraparte (conta não identificada no extrato), o
-    // vínculo vale só para este lançamento específico — não tem como
-    // reconhecer "a mesma conta" de novo no futuro.
-    if (chave) {
-      await setDoc(doc(db, 'filiais', filialId, 'vinculosGastoBancarios', idVinculoGasto(chave)), vinculoDoc);
-    }
-    await setDoc(
-      doc(db, 'filiais', filialId, 'gastos', `extrato_${lancamento.id}`),
-      {
-        data: lancamento.data,
-        categoria: escolha.categoria,
-        valor: lancamento.valor,
-        descricao: lancamento.contraparteNome || lancamento.historico,
-        origem: 'extrato',
-        chaveContraparte: chave ?? '',
-        ...(escolha.funcionarioId
-          ? { funcionarioId: escolha.funcionarioId, funcionarioNome: escolha.extra }
-          : { funcionarioId: null, funcionarioNome: null }),
-        ...(escolha.tipoLista === 'distribuidoras' ? { distribuidora: escolha.extra } : { distribuidora: null }),
-        ...(escolha.tipoLista === 'tiposImposto' ? { tipoImposto: escolha.extra } : { tipoImposto: null }),
-      },
-      { merge: true }
-    );
-    setAssociandoGasto(null);
   }
 
   const termo = filtro.trim().toLowerCase();
@@ -316,6 +257,26 @@ function ExtratoBB({ filialId }) {
         </span>
       </div>
 
+      <div className="extrato__toolbar extrato__toolbar--export">
+        <span className="extrato__label-export">Exportar Excel (Data/Gastos/Lucros/Saldo):</span>
+        <input
+          type="date"
+          value={exportInicio}
+          onChange={(e) => setExportInicio(e.target.value)}
+          aria-label="Data inicial da exportação"
+        />
+        <span>até</span>
+        <input
+          type="date"
+          value={exportFim}
+          onChange={(e) => setExportFim(e.target.value)}
+          aria-label="Data final da exportação"
+        />
+        <button type="button" onClick={handleExportar} disabled={exportando}>
+          {exportando ? 'Gerando…' : 'Exportar Excel'}
+        </button>
+      </div>
+
       <div className="extrato__table-scroll">
       <table className="crud-tab__table extrato__table">
         <thead>
@@ -323,19 +284,19 @@ function ExtratoBB({ filialId }) {
             <th>Data</th>
             <th>Histórico</th>
             <th>Conta / favorecido</th>
-            <th>Cliente / categoria</th>
+            <th>Cliente</th>
             <th className="extrato__num">Valor</th>
           </tr>
         </thead>
         <tbody>
           {visiveis.map((l) => {
             const v = vinculoPorChave.get(l.chaveContraparte);
-            const vGasto = vinculoGastoPorChave.get(l.chaveContraparte);
             return (
               <tr
                 key={l.id}
-                className={l.baixaId ? (l.tipo === 'debito' ? 'is-conciliado-gasto' : 'is-conciliado') : ''}
+                className={l.baixaId ? 'is-conciliado' : ''}
                 onContextMenu={(e) => {
+                  if (l.tipo !== 'credito') return;
                   e.preventDefault();
                   setMenu({ x: e.clientX, y: e.clientY, lancamento: l });
                 }}
@@ -355,15 +316,8 @@ function ExtratoBB({ filialId }) {
                     ) : (
                       <span className="extrato__vazio">—</span>
                     )
-                  ) : vGasto ? (
-                    <span className="extrato__categoria">
-                      {vGasto.categoria}
-                      {vGasto.funcionarioNome || vGasto.distribuidora || vGasto.tipoImposto
-                        ? ` · ${vGasto.funcionarioNome ?? vGasto.distribuidora ?? vGasto.tipoImposto}`
-                        : ''}
-                    </span>
                   ) : (
-                    <span className="extrato__vazio">a categorizar</span>
+                    <span className="extrato__vazio">—</span>
                   )}
                 </td>
                 <td className={`extrato__num extrato__valor--${l.tipo}`}>
@@ -388,11 +342,11 @@ function ExtratoBB({ filialId }) {
 
       <p className="crud-tab__note">
         Clique com o botão direito numa linha de <strong>entrada</strong> pra associá-la a um
-        cliente cadastrado, ou numa de <strong>saída</strong> pra categorizá-la como gasto. A
-        associação é por conta (CPF/CNPJ, ou nome quando o banco não informa o documento) — um
-        mesmo cliente ou categoria pode ter várias contas associadas, e todo lançamento futuro
-        daquela conta já entra reconhecido. Todo débito do extrato vira gasto automaticamente
-        (aba Gastos), categorizado ou não.
+        cliente cadastrado. A associação é por conta (CPF/CNPJ, ou nome quando o banco não
+        informa o documento) — um mesmo cliente pode ter várias contas associadas, e todo
+        lançamento futuro daquela conta já entra reconhecido. Linhas de <strong>saída</strong>{' '}
+        (débito/cobrança) aparecem aqui só como registro do extrato — não há mais categorização
+        de gasto no sistema.
       </p>
 
       {menu && (
@@ -400,31 +354,22 @@ function ExtratoBB({ filialId }) {
           x={menu.x}
           y={menu.y}
           onClose={() => setMenu(null)}
-          itens={
-            menu.lancamento.tipo === 'credito'
+          itens={[
+            {
+              label: 'Associar cliente',
+              desabilitado: !menu.lancamento.chaveContraparte,
+              onClick: () => setAssociandoCliente(menu.lancamento),
+            },
+            ...(vinculoPorChave.get(menu.lancamento.chaveContraparte)
               ? [
                   {
-                    label: 'Associar cliente',
-                    desabilitado: !menu.lancamento.chaveContraparte,
-                    onClick: () => setAssociandoCliente(menu.lancamento),
-                  },
-                  ...(vinculoPorChave.get(menu.lancamento.chaveContraparte)
-                    ? [
-                        {
-                          label: 'Remover associação',
-                          perigo: true,
-                          onClick: () => removerVinculoCliente(menu.lancamento),
-                        },
-                      ]
-                    : []),
-                ]
-              : [
-                  {
-                    label: 'Associar gasto',
-                    onClick: () => setAssociandoGasto(menu.lancamento),
+                    label: 'Remover associação',
+                    perigo: true,
+                    onClick: () => removerVinculoCliente(menu.lancamento),
                   },
                 ]
-          }
+              : []),
+          ]}
         />
       )}
 
@@ -435,16 +380,6 @@ function ExtratoBB({ filialId }) {
           vinculoAtual={vinculoPorChave.get(associandoCliente.chaveContraparte)}
           onCancel={() => setAssociandoCliente(null)}
           onConfirm={(cliente) => salvarVinculoCliente(associandoCliente, cliente)}
-        />
-      )}
-
-      {associandoGasto && (
-        <AssociarGastoModal
-          filialId={filialId}
-          lancamento={associandoGasto}
-          vinculoAtual={vinculoGastoPorChave.get(associandoGasto.chaveContraparte)}
-          onCancel={() => setAssociandoGasto(null)}
-          onConfirm={(escolha) => salvarVinculoGasto(associandoGasto, escolha)}
         />
       )}
     </div>

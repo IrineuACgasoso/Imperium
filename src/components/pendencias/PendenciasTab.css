@@ -81,7 +81,7 @@
    o que por si só já reduz bastante a área que o navegador precisa
    rasterizar durante o scroll da página. */
 .pend__col-scroll {
-  max-height: 62vh;
+  max-height: 72vh;
   overflow-y: auto;
   border: 1px solid rgba(242, 233, 251, 0.08);
   border-radius: var(--radius-control);
@@ -109,8 +109,30 @@
   }
 
   .pend__col-scroll {
-    max-height: 50vh;
+    max-height: 58vh;
   }
+}
+
+.pend__col-header-left {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pend__busca-cliente {
+  background: var(--bg-deep);
+  border: 1px solid rgba(242, 233, 251, 0.16);
+  border-radius: var(--radius-control);
+  color: var(--text-primary);
+  padding: 4px 10px;
+  font-size: 12px;
+  min-width: 160px;
+}
+
+.pend__busca-cliente:focus {
+  outline: none;
+  border-color: rgba(242, 233, 251, 0.4);
 }
 
 .pend__col-title {
