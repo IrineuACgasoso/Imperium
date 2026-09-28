@@ -123,9 +123,7 @@ function ExtratoBB({ filialId }) {
     try {
       const conteudo = await lerArquivo(file);
       const resultado = parseExtratoBB(conteudo, file.name);
-      if (resultado.periodoInvalido) {
-        setErro(resultado.erro);
-      } else if (!resultado.lancamentos.length) {
+      if (!resultado.lancamentos.length) {
         setErro(
           'Não identifiquei nenhum lançamento nesse arquivo. Se for PDF, tente exportar o mesmo período em OFX — é o formato mais confiável.'
         );

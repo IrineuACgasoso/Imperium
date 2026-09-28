@@ -484,33 +484,10 @@ export function parseExtratoBB(conteudo, nomeArquivo = '') {
     return { ...base, sequencia: indice };
   });
 
-  // Um único dia por arquivo, sem exceção. Isso elimina de vez o risco de
-  // duplicidade por período sobreposto: se cada importação cobre só um dia,
-  // reimportar o mesmo dia é sempre "atualizar aquele dia" (idempotente,
-  // graças ao ID determinístico de cada lançamento), nunca "e se o período
-  // de ontem se sobrepuser ao de hoje?". A desambiguação por ordem acima
-  // continua existindo como segunda camada de segurança, mas não precisa
-  // mais lidar com múltiplos dias ao mesmo tempo.
-  const diasDistintos = Array.from(new Set(desambiguada.map((l) => l.data))).sort();
-  if (diasDistintos.length > 1) {
-    return {
-      formato,
-      lancamentos: [],
-      semContraparte: 0,
-      periodoInvalido: true,
-      erro:
-        `Este arquivo cobre ${diasDistintos.length} dias diferentes ` +
-        `(${diasDistintos[0].split('-').reverse().join('/')} até ` +
-        `${diasDistintos[diasDistintos.length - 1].split('-').reverse().join('/')}), e o Extrato só aceita um dia por vez. ` +
-        `No BB Digital, gere o extrato com "de" e "até" iguais e importe de novo.`,
-    };
-  }
-
   return {
     formato,
     lancamentos: desambiguada,
     semContraparte: desambiguada.filter((l) => !l.chaveContraparte).length,
-    periodoInvalido: false,
   };
 }
 

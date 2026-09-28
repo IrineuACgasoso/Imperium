@@ -1,9 +1,9 @@
 import ExcelJS from 'exceljs';
 
-const VERDE = 'FF00FF00'; // fechado (baixaId presente)
+const VERDE = 'FF2E7D32'; // fechado (baixaId presente)
 const PRETO = 'FF1A1A1A'; // pendente
-const VERMELHO = 'FFFF0000'; // valor de gasto
-const AZUL = 'FF0070EE'; // valor de lucro
+const VERMELHO = 'FFC00000'; // valor de gasto
+const AZUL = 'FF0070C0'; // valor de lucro
 
 /**
  * Gera o .xlsx "Data / Descrição / Gastos / Lucros / Saldo" a partir das
