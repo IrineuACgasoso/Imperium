@@ -4,7 +4,6 @@ import { formatarDocumento } from './utils.js';
 
 export default function AssociarClienteModal({ lancamento, clientes, vinculoAtual, onCancel, onConfirm }) {
   const [nome, setNome] = useState(vinculoAtual?.clienteNome ?? '');
-  const [clienteId, setClienteId] = useState(vinculoAtual?.clienteId ?? '');
 
   // Memoizado: sem isso, cada tecla digitada recriava este array inteiro e
   // derrubava o cache de filtro do Combobox à toa.
@@ -13,10 +12,17 @@ export default function AssociarClienteModal({ lancamento, clientes, vinculoAtua
     [clientes]
   );
 
-  // Sempre que o texto muda por digitação (option === null), a escolha
-  // anterior é invalidada — só um clique numa opção da lista confirma um
-  // cliente de verdade, o texto sozinho não basta pra "Associar" habilitar.
-  const cliente = clientes.find((c) => c.id === clienteId);
+  // Escolher um cliente de verdade (Enter ou clique numa opção da lista) já
+  // confirma a associação na hora — não existe mais um botão "Associar"
+  // separado pra clicar depois. Só digitar sem escolher nada não faz nada
+  // (não dá pra associar um cliente que não existe).
+  function handleChange(v, option) {
+    setNome(v);
+    if (option?.id) {
+      const cliente = clientes.find((c) => c.id === option.id);
+      if (cliente) onConfirm(cliente);
+    }
+  }
 
   return (
     <div className="modal-overlay" onMouseDown={onCancel}>
@@ -30,24 +36,15 @@ export default function AssociarClienteModal({ lancamento, clientes, vinculoAtua
         </p>
         <Combobox
           value={nome}
-          onChange={(v, option) => {
-            setNome(v);
-            setClienteId(option?.id ?? '');
-          }}
+          onChange={handleChange}
           options={options}
           placeholder="Digite pra buscar o cliente cadastrado"
           allowFree
+          autoFocus
+          confirmarPrimeiraOpcao
           minWidth={320}
         />
         <div className="modal__actions">
-          <button
-            type="button"
-            className="pdf-import__confirm"
-            disabled={!cliente}
-            onClick={() => onConfirm(cliente)}
-          >
-            Associar
-          </button>
           <button type="button" className="pdf-import__cancel" onClick={onCancel}>
             Cancelar
           </button>

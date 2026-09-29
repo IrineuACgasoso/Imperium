@@ -9,7 +9,8 @@
 // que ele já usava pra outro formato de arquivo):
 // - "Cobrança" é sempre um CRÉDITO (dinheiro que ENTROU de boletos pagos por
 //   clientes). Quando há mais de um lançamento "Cobrança" no mesmo dia, eles
-//   são somados numa única linha "Cobrança(N Títulos DD/MM/AA)".
+//   são somados numa única linha, descrita só como "Cobrança" (sem contagem
+//   de títulos nem data — pedido explícito: só "Cobrança", sem mais nada).
 // - Qualquer outro débito do dia (nome de empresa, tarifa, etc.) é um GASTO,
 //   sem nenhuma relação com a Cobrança — mesmo aparecendo logo abaixo dela.
 // - Coluna C = gasto (débito), coluna D = lucro (crédito). Nunca as duas na
@@ -20,18 +21,8 @@
 // - Cor do nome (verde/preto) = está ou não conciliado (`baixaId`). Nada a
 //   ver com o valor entrar em C ou D.
 
-function normalizarHistorico(historico) {
-  return (historico ?? '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-    .toLowerCase();
-}
 
-function formatarDataCurta(iso) {
-  const [a, m, d] = iso.split('-');
-  return `${d}/${m}/${a.slice(2)}`;
-}
+import { normalizarHistorico } from '../shared/texto.js';
 
 function formatarDataLonga(iso) {
   const [a, m, d] = iso.split('-');
@@ -57,7 +48,7 @@ function montarLinhasDoDia(iso, lancamentosDoDia) {
   if (cobrancas.length > 0) {
     const total = cobrancas.reduce((s, l) => s + Number(l.valor || 0), 0);
     linhas.push({
-      descricao: `Cobrança(${cobrancas.length} Título${cobrancas.length > 1 ? 's' : ''} ${formatarDataCurta(iso)})`,
+      descricao: 'Cobrança',
       gasto: null,
       lucro: total,
       fechado: cobrancas.every((l) => !!l.baixaId),

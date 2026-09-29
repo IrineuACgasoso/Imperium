@@ -2,4 +2,12 @@ node_modules
 dist
 .env
 .env.local
-src/dev/
+
+# Ferramenta de reset de dados de teste — de propósito FORA do controle de
+# versão. É um script destrutivo (apaga em lote), então não deve existir no
+# histórico do GitHub nem em qualquer deploy (Vercel etc.) — só na sua
+# máquina, rodado localmente quando você decide usar. Se o arquivo já foi
+# commitado antes desta linha existir, rode `git rm --cached src/dev/resetFilial.js`
+# uma vez pra tirá-lo do histórico daqui pra frente (o Git não reescreve
+# commits antigos sozinho).
+src/dev/resetFilial.js

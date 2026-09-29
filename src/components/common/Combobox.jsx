@@ -28,7 +28,17 @@ const normalize = (s) =>
  * com as setas; caso contrário mantém o que ele digitou e avança.
  */
 const Combobox = forwardRef(function Combobox(
-  { value, onChange, options, placeholder, allowFree = false, minWidth = 170, ariaLabel },
+  {
+    value,
+    onChange,
+    options,
+    placeholder,
+    allowFree = false,
+    minWidth = 170,
+    ariaLabel,
+    autoFocus = false,
+    confirmarPrimeiraOpcao = false,
+  },
   ref
 ) {
   const [open, setOpen] = useState(false);
@@ -40,6 +50,18 @@ const Combobox = forwardRef(function Combobox(
   const controlRef = useRef(null);
 
   useImperativeHandle(ref, () => controlRef.current, []);
+
+  // `autoFocus` pronto pra usar em modal: o navegador não dá foco automático
+  // a um input que acabou de aparecer num overlay, então sem isso a pessoa
+  // sempre tinha que clicar antes de poder digitar. `select()` junto já
+  // deixa o texto (se vier preenchido, ex: reabrindo pra trocar o cliente)
+  // pronto pra ser substituído com a primeira tecla, sem precisar apagar.
+  useEffect(() => {
+    if (!autoFocus || !controlRef.current) return;
+    controlRef.current.focus();
+    controlRef.current.select?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filtered = useMemo(() => {
     if (!allowFree) return options;
@@ -120,6 +142,16 @@ const Combobox = forwardRef(function Combobox(
         return;
       }
       if (allowFree) {
+        // `confirmarPrimeiraOpcao`: Enter sem ter usado as setas já escolhe o
+        // primeiro resultado filtrado — é o que permite digitar o nome e
+        // apertar Enter direto, sem precisar navegar ou tocar no mouse.
+        // Sem essa flag (comportamento antigo, usado onde criar um valor
+        // novo é uma opção válida — distribuidora, categoria...), o texto
+        // digitado vale como está, mesmo sem bater com nenhuma opção.
+        if (confirmarPrimeiraOpcao && filtered.length > 0) {
+          choose(filtered[0], true);
+          return;
+        }
         // Texto livre sem opção destacada: vale o que foi digitado.
         setOpen(false);
         avancar();

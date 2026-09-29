@@ -12,3 +12,14 @@ export function normalizarNomeCliente(nome) {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+// Mesma ideia, só que pra comparar `historico` do extrato (ex: identificar
+// "Cobrança" independente de acento/caixa) — minúsculo em vez de maiúsculo
+// só por convenção de quem já usava isso antes (extratoExport.js).
+export function normalizarHistorico(historico) {
+  return (historico ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}

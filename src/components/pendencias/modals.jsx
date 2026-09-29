@@ -5,12 +5,20 @@ import { currency, formatarData } from './utils.js';
 
 export function AssociarClientePendenciasModal({ lancamento, clientes, vinculoAtual, onCancel, onConfirm }) {
   const [nome, setNome] = useState(vinculoAtual?.clienteNome ?? '');
-  const [clienteId, setClienteId] = useState(vinculoAtual?.clienteId ?? '');
-  const cliente = clientes.find((c) => c.id === clienteId);
   const options = useMemo(
     () => clientes.map((c) => ({ value: c.nome, label: c.nome, id: c.id })),
     [clientes]
   );
+
+  // Mesmo padrão do AssociarClienteModal da aba Extrato: escolher um cliente
+  // de verdade (Enter ou clique) já confirma na hora, sem botão separado.
+  function handleChange(v, option) {
+    setNome(v);
+    if (option?.id) {
+      const cliente = clientes.find((c) => c.id === option.id);
+      if (cliente) onConfirm(cliente);
+    }
+  }
 
   return (
     <div className="modal-overlay" onMouseDown={onCancel}>
@@ -24,24 +32,15 @@ export function AssociarClientePendenciasModal({ lancamento, clientes, vinculoAt
         </p>
         <Combobox
           value={nome}
-          onChange={(v, option) => {
-            setNome(v);
-            setClienteId(option?.id ?? '');
-          }}
+          onChange={handleChange}
           options={options}
           placeholder="Digite pra buscar o cliente cadastrado"
           allowFree
+          autoFocus
+          confirmarPrimeiraOpcao
           minWidth={320}
         />
         <div className="modal__actions">
-          <button
-            type="button"
-            className="pdf-import__confirm"
-            disabled={!cliente}
-            onClick={() => onConfirm(cliente)}
-          >
-            Associar
-          </button>
           <button type="button" className="pdf-import__cancel" onClick={onCancel}>
             Cancelar
           </button>

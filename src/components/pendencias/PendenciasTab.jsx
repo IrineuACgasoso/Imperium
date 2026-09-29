@@ -4,6 +4,7 @@ import { db } from '../../config/firebase.js';
 import { useFilialCollection } from '../../hooks/useFilialCollection.js';
 import { abreviarFormaPagamento } from '../../parsers/extratoBB.js';
 import { idVinculo } from '../../shared/vinculo.js';
+import { normalizarHistorico } from '../../shared/texto.js';
 import {
   casarAutomatico,
   diferencaSelecao,
@@ -194,11 +195,17 @@ function PendenciasTabInner({ filialId }) {
   const vendasAbertas = [...vendasAbertasBase].sort((a, b) =>
     ordemVendasAsc ? a.data.localeCompare(b.data) : b.data.localeCompare(a.data)
   );
-  // Só créditos: gasto e cobrança de boleto nunca são baixa de venda, então
-  // nem entram nesta tela — o leitor do extrato (aba Extrato) continua
-  // guardando e mostrando esses débitos normalmente, só não aqui.
+  // Só créditos: gasto (débito) nunca é baixa de venda, e "Cobrança" —
+  // mesmo sendo crédito — também não é, porque é um agregado de vários
+  // boletos pagos por clientes diferentes, nunca o pagamento de UMA venda
+  // específica do CDS. Sem essa exclusão, "Cobrança" ficava pra sempre
+  // pendente aqui, já que nunca vai existir uma venda pra casar com ela.
   const lancamentosAbertos = lancamentos.filter(
-    (l) => !l.baixaId && !l.arquivado && l.tipo === 'credito'
+    (l) =>
+      !l.baixaId &&
+      !l.arquivado &&
+      l.tipo === 'credito' &&
+      normalizarHistorico(l.historico) !== 'cobranca'
   );
   const extratoAberto = [...lancamentosAbertos]
     .filter((l) => !filtroDataExtrato || l.data === filtroDataExtrato)
