@@ -5,6 +5,8 @@
 
 .dashboard__main {
   flex: 1;
+  /* Sem isto, conteúdo largo de qualquer aba empurra o painel inteiro pra direita. */
+  min-width: 0;
   padding: 32px 40px;
   display: flex;
   flex-direction: column;

@@ -9,12 +9,14 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  where,
 } from 'firebase/firestore';
 import { db, firebaseIsConfigured } from '../config/firebase.js';
 
 /**
  * Assina em tempo real filiais/{filialId}/{subcollection}, ordenado por
- * `orderByField` (padrão "criadoEm", desc). Retorna helpers de escrita já
+ * `orderByField` (padrão "criadoEm", desc; `null` = sem ordenação) e,
+ * opcionalmente, filtrado no servidor por `filtros` (ver abaixo). Retorna helpers de escrita já
  * amarrados à filial ativa.
  *
  * --- Por que existe um cache aqui -----------------------------------------
@@ -34,16 +36,29 @@ import { db, firebaseIsConfigured } from '../config/firebase.js';
  * coleção por tempo suficiente é que o listener realmente fecha.
  */
 
+/**
+ * --- Filtros no servidor ---------------------------------------------------
+ * O 4º parâmetro `filtros` é uma lista de [campo, operador, valor] aplicada
+ * no Firestore: documentos fora do filtro NÃO são lidos (e não contam na cota
+ * de leituras). Duas regras para não exigir índice composto:
+ *  - use só filtros de igualdade (`==`), quantos quiser;
+ *  - passe `orderByField = null` (ordene no cliente). Igualdade + orderBy em
+ *    outro campo é o que exigiria índice composto.
+ * `filtros` deve ser uma constante de módulo (ver data/filtrosAbertos.js).
+ * Atenção: `where(campo, '==', null)` só encontra docs em que o campo existe
+ * e vale null — quem cria os docs precisa gravar o campo.
+ */
+
 const GRACE_MS = 45_000; // tempo que um listener sem ouvintes fica "quente" antes de fechar
 
 const cache = new Map(); // chave -> { items, loading, listeners:Set<fn>, unsubscribe, teardownTimer, refCount }
 
-function cacheKey(filialId, subcollection, orderByField) {
-  return `${filialId}/${subcollection}/${orderByField}`;
+function cacheKey(filialId, subcollection, orderByField, filtros) {
+  return `${filialId}/${subcollection}/${orderByField ?? '-'}/${JSON.stringify(filtros)}`;
 }
 
-function getEntry(filialId, subcollection, orderByField) {
-  const key = cacheKey(filialId, subcollection, orderByField);
+function getEntry(filialId, subcollection, orderByField, filtros) {
+  const key = cacheKey(filialId, subcollection, orderByField, filtros);
   let entry = cache.get(key);
   if (entry) return entry;
 
@@ -59,7 +74,8 @@ function getEntry(filialId, subcollection, orderByField) {
 
   const q = query(
     collection(db, 'filiais', filialId, subcollection),
-    orderBy(orderByField, 'desc')
+    ...filtros.map(([campo, op, valor]) => where(campo, op, valor)),
+    ...(orderByField ? [orderBy(orderByField, 'desc')] : [])
   );
 
   entry.unsubscribe = onSnapshot(
@@ -79,9 +95,9 @@ function getEntry(filialId, subcollection, orderByField) {
   return entry;
 }
 
-function subscribe(filialId, subcollection, orderByField, onChange) {
-  const key = cacheKey(filialId, subcollection, orderByField);
-  const entry = getEntry(filialId, subcollection, orderByField);
+function subscribe(filialId, subcollection, orderByField, filtros, onChange) {
+  const key = cacheKey(filialId, subcollection, orderByField, filtros);
+  const entry = getEntry(filialId, subcollection, orderByField, filtros);
 
   // Alguém quer esses dados de novo: cancela o fechamento agendado, se houver.
   if (entry.teardownTimer) {
@@ -110,20 +126,30 @@ function subscribe(filialId, subcollection, orderByField, onChange) {
   };
 }
 
-export function useFilialCollection(filialId, subcollection, orderByField = 'criadoEm') {
+const SEM_FILTROS = [];
+
+export function useFilialCollection(
+  filialId,
+  subcollection,
+  orderByField = 'criadoEm',
+  filtros = SEM_FILTROS
+) {
   const [, forceRender] = useState(0);
   const active = firebaseIsConfigured && !!filialId;
-  const entry = active ? getEntry(filialId, subcollection, orderByField) : null;
+  const entry = active ? getEntry(filialId, subcollection, orderByField, filtros) : null;
+  const filtrosKey = JSON.stringify(filtros);
 
   useEffect(() => {
     if (!active) return undefined;
-    const unsub = subscribe(filialId, subcollection, orderByField, () => forceRender((n) => n + 1));
+    const unsub = subscribe(filialId, subcollection, orderByField, filtros, () =>
+      forceRender((n) => n + 1)
+    );
     // Se os dados já chegaram entre o getEntry() do render e este effect,
     // força um render pra refletir (evita ficar preso no estado inicial).
     forceRender((n) => n + 1);
     return unsub;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filialId, subcollection, orderByField, active]);
+  }, [filialId, subcollection, orderByField, filtrosKey, active]);
 
   const items = active ? entry.items : [];
   const loading = active ? entry.loading : false;

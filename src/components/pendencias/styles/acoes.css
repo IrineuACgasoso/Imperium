@@ -1,0 +1,95 @@
+/* Barra de seleção, botões de baixa e aviso. Usado também em Fechamentos (.pend__secundario). */
+
+.pend__acoes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  padding-top: 4px;
+}
+
+.pend__selecao {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 9px 16px;
+  border-radius: var(--radius-control);
+  font-size: 12.5px;
+  border: 1px solid transparent;
+}
+
+.pend__selecao.is-ok {
+  background: var(--state-success-bg);
+  border-color: rgba(51, 230, 160, 0.4);
+  color: var(--state-success);
+}
+
+.pend__selecao.is-diff {
+  background: rgba(255, 204, 77, 0.1);
+  border-color: rgba(255, 204, 77, 0.4);
+  color: var(--accent-gold);
+}
+
+.pend__limpar {
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-decoration: underline;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pend__botoes {
+  display: flex;
+  gap: 10px;
+}
+
+.pend__primario {
+  padding: 11px 26px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: linear-gradient(120deg, var(--accent-neon), #c92eff);
+  color: #150826;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.pend__secundario {
+  padding: 11px 20px;
+  border: 1px solid var(--panel-border-soft);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.pend__primario:disabled,
+.pend__secundario:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pend__aviso {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  text-align: center;
+  max-width: 720px;
+}
+
+/* Campo de justificativa dos modais (modals.jsx). */
+.pend__justificativa {
+  width: 100%;
+  resize: vertical;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--panel-border-soft);
+  background: rgba(18, 8, 33, 0.45);
+  color: var(--text-primary);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+}

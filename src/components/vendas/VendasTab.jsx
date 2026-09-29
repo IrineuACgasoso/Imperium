@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { db } from '../../config/firebase.js';
 import { handleEnterNavigation, focusFirstField } from '../../utils/formNav.js';
 import { useFilialCollection } from '../../hooks/useFilialCollection.js';
 import { usePdfImport } from '../../hooks/usePdfImport.js';
 import { parseCaixaDiario, parseVendasPorMes } from '../../parsers/caixaDiario.js';
 import { arredondar2 } from '../../utils/numero.js';
+import { baixaIdInicial } from '../../data/filtrosAbertos.js';
 import { normalizarNomeCliente } from '../../shared/texto.js';
 import FirebaseGate from '../layout/FirebaseGate.jsx';
 import '../../shared/CrudTab.css';
@@ -188,10 +189,20 @@ function ImportarCaixa({ filialId }) {
       // Manda cada venda individual pra fila de conciliação (aba Pendências).
       // ID determinístico: reimportar o mesmo caixa atualiza as mesmas linhas
       // em vez de duplicar a fila.
+      // Uma consulta só, restrita ao dia importado, para saber quais dessas
+      // vendas já foram baixadas (reimportar não pode desfazer a baixa).
+      const doDia = await getDocs(
+        query(
+          collection(db, 'filiais', filialId, 'pendenciasVendas'),
+          where('data', '==', resultado.data)
+        )
+      );
+      const existentes = new Map(doDia.docs.map((d) => [d.id, d.data()]));
       for (const [idx, venda] of (resultado.vendasDetalhadas ?? []).entries()) {
         const sufixo = venda.numeroVenda || `l${idx}`;
+        const idVenda = `${resultado.data}_${sufixo}`;
         await setDoc(
-          doc(db, 'filiais', filialId, 'pendenciasVendas', `${resultado.data}_${sufixo}`),
+          doc(db, 'filiais', filialId, 'pendenciasVendas', idVenda),
           {
             data: resultado.data,
             numeroVenda: venda.numeroVenda,
@@ -200,6 +211,7 @@ function ImportarCaixa({ filialId }) {
             forma: venda.forma,
             campo: venda.campo,
             origem: 'caixa-diario',
+            ...baixaIdInicial(existentes.get(idVenda)),
             criadoEm: serverTimestamp(),
           },
           { merge: true }

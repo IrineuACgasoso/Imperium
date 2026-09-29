@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import Combobox from '../common/Combobox.jsx';
 import { formatarDocumentoExibicao } from '../../parsers/extratoBB.js';
 import { currency, formatarData } from './utils.js';
+import { FORMAS_COMPLEMENTO } from './constants.js';
 
 export function AssociarClientePendenciasModal({ lancamento, clientes, vinculoAtual, onCancel, onConfirm }) {
   const [nome, setNome] = useState(vinculoAtual?.clienteNome ?? '');

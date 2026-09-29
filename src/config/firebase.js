@@ -6,7 +6,11 @@
 // falta de configuração.
 
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -21,6 +25,14 @@ const firebaseConfig = {
 const isConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
 
 export const app = isConfigured && getApps().length === 0 ? initializeApp(firebaseConfig) : undefined;
-export const db = app ? getFirestore(app) : undefined;
+// Cache local persistente (IndexedDB): ao recarregar a página, os listeners
+// retomam de onde pararam e o servidor só cobra os documentos que MUDARAM
+// (dentro de ~30 min); sem isso, cada F5 relia todas as coleções assinadas.
+// Multi-aba: várias abas do navegador compartilham o mesmo cache.
+export const db = app
+  ? initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    })
+  : undefined;
 export const auth = app ? getAuth(app) : undefined;
 export const firebaseIsConfigured = isConfigured;

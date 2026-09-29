@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../config/firebase.js';
+import { baixaIdInicial } from '../../data/filtrosAbertos.js';
 import { useFilialCollection } from '../../hooks/useFilialCollection.js';
 import { extrairTextoPdf } from '../../parsers/pdfToText.js';
 import { parseExtratoBB } from '../../parsers/extratoBB.js';
@@ -140,6 +141,9 @@ function ExtratoBB({ filialId }) {
   async function confirmarImportacao() {
     setSalvando(true);
     try {
+      // `lancamentos` já está em memória (esta aba lê a coleção inteira):
+      // dá para saber quais já foram baixados sem nenhuma leitura extra.
+      const existentes = new Map(lancamentos.map((x) => [x.id, x]));
       for (const l of previa.lancamentos) {
         // merge: se o lançamento já existe e já foi conciliado, reimportar o
         // extrato não pode desfazer a baixa nem apagar o vínculo. Débitos só
@@ -147,7 +151,12 @@ function ExtratoBB({ filialId }) {
         // categorização de gasto no sistema.
         await setDoc(
           doc(db, 'filiais', filialId, 'extratoLancamentos', l.id),
-          { ...l, importadoEm: serverTimestamp(), criadoEm: serverTimestamp() },
+          {
+            ...l,
+            ...baixaIdInicial(existentes.get(l.id)),
+            importadoEm: serverTimestamp(),
+            criadoEm: serverTimestamp(),
+          },
           { merge: true }
         );
       }
@@ -443,6 +452,7 @@ function ExtratoRede({ filialId }) {
   async function confirmarImportacao() {
     setSalvando(true);
     try {
+      const existentes = new Map(lancamentosCartao.map((x) => [x.id, x]));
       for (const v of previa.vendas) {
         const id = idLinhaCartao(v, 'rede');
         // merge: se essa linha já foi importada e já tem baixaId, reimportar
@@ -456,6 +466,7 @@ function ExtratoRede({ filialId }) {
             parcelas: v.parcelas,
             nsu: v.nsu || '',
             adquirente: 'rede',
+            ...baixaIdInicial(existentes.get(id)),
             importadoEm: serverTimestamp(),
             criadoEm: serverTimestamp(),
           },

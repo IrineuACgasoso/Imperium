@@ -13,30 +13,35 @@
 // leitura extra nenhuma aqui, e o campo fica igual a todo formulário do
 // sistema (select, não texto livre).
 
-import { useMemo, useState } from 'react';
-import { collection, query, where, orderBy, getDocs, doc, getDoc } from 'firebase/firestore';
+import { useCallback, useMemo, useState } from 'react';
+import { collection, query, where, orderBy, getDocs, documentId } from 'firebase/firestore';
 import { db } from '../../config/firebase.js';
 import { useFilialCollection } from '../../hooks/useFilialCollection.js';
 import { restaurarBaixa } from '../../data/baixas.js';
+import { CARTAO_EM_ABERTO, VENDAS_EM_ABERTO } from '../../data/filtrosAbertos.js';
 import FirebaseGate from '../layout/FirebaseGate.jsx';
 import Combobox from '../common/Combobox.jsx';
-import { currency, formatarData } from '../pendencias/utils.js';
+import { currency, hojeISO } from '../pendencias/utils.js';
+import BaixaCard from './BaixaCard.jsx';
 import '../../shared/CrudTab.css';
-import '../extrato/ExtratoTab.css';
-import '../pendencias/PendenciasTab.css';
+import '../pendencias/styles/acoes.css';
 import './FechamentosTab.css';
 
-function hojeISO() {
-  return new Date().toISOString().slice(0, 10);
-}
+// `where(documentId(), 'in', ...)` aceita até 30 ids por consulta: 1 ida ao
+// servidor por 30 docs, em vez de 1 getDoc por documento.
+const TAM_IN = 30;
 
 async function buscarDocs(filialId, colecao, ids) {
   const unicos = [...new Set(ids)];
   const mapa = new Map();
+  const grupos = [];
+  for (let i = 0; i < unicos.length; i += TAM_IN) grupos.push(unicos.slice(i, i + TAM_IN));
   await Promise.all(
-    unicos.map(async (id) => {
-      const snap = await getDoc(doc(db, 'filiais', filialId, colecao, id));
-      if (snap.exists()) mapa.set(id, { id: snap.id, ...snap.data() });
+    grupos.map(async (grupo) => {
+      const snap = await getDocs(
+        query(collection(db, 'filiais', filialId, colecao), where(documentId(), 'in', grupo))
+      );
+      snap.forEach((d) => mapa.set(d.id, { id: d.id, ...d.data() }));
     })
   );
   return mapa;
@@ -54,8 +59,16 @@ function FechamentosTabInner({ filialId }) {
   // Só pra popular o select de forma de pagamento — mesma coleção que
   // Pendências já mantém assinada, então isto reaproveita o cache do hook
   // em vez de abrir uma segunda leitura.
-  const { items: vendas } = useFilialCollection(filialId, 'pendenciasVendas', 'data');
-  const { items: extratoCartao } = useFilialCollection(filialId, 'extratoCartao', 'data');
+  // Mesmas consultas filtradas de Pendências (compartilham o listener).
+  // Limitação: formas/bandeiras que só existem em itens já baixados não
+  // aparecem neste select.
+  const { items: vendas } = useFilialCollection(filialId, 'pendenciasVendas', null, VENDAS_EM_ABERTO);
+  const { items: extratoCartao } = useFilialCollection(
+    filialId,
+    'extratoCartao',
+    null,
+    CARTAO_EM_ABERTO
+  );
 
   const formasDisponiveis = useMemo(() => {
     const set = new Set();
@@ -138,7 +151,7 @@ function FechamentosTabInner({ filialId }) {
     }
   }
 
-  async function handleRestaurar(baixa) {
+  const handleRestaurar = useCallback(async (baixa) => {
     setRestaurandoId(baixa.id);
     try {
       const ok = await restaurarBaixa(filialId, baixa);
@@ -148,7 +161,20 @@ function FechamentosTabInner({ filialId }) {
     } finally {
       setRestaurandoId(null);
     }
-  }
+  }, [filialId]);
+
+  // Arrays estáveis por baixa: sem isto o memo do BaixaCard nunca acerta.
+  const cards = useMemo(
+    () =>
+      (resultado?.baixas ?? []).map((b) => ({
+        baixa: b,
+        vendas: (b.vendaIds ?? []).map((id) => resultado.vendasPorId.get(id)).filter(Boolean),
+        lancamentos: (b.lancamentoIds ?? [])
+          .map((id) => resultado.lancamentosPorId.get(id))
+          .filter(Boolean),
+      })),
+    [resultado]
+  );
 
   const totalPeriodo = resultado?.baixas.reduce((s, b) => s + Number(b.total || 0), 0) ?? 0;
 
@@ -187,133 +213,18 @@ function FechamentosTabInner({ filialId }) {
             {resultado.baixas.length} fechamento(s) no período · total {currency.format(totalPeriodo)}
           </p>
 
-          {resultado.baixas.map((b) => {
-            const vendasDaBaixa = (b.vendaIds ?? [])
-              .map((id) => resultado.vendasPorId.get(id))
-              .filter(Boolean);
-            const lancamentosDaBaixa = (b.lancamentoIds ?? [])
-              .map((id) => resultado.lancamentosPorId.get(id))
-              .filter(Boolean);
-            const ehCartao = b.colecaoLancamento === 'extratoCartao';
-
-            return (
-              <div key={b.id} className="fech__baixa">
-                <div className="fech__baixa-header">
-                  <span>
-                    {new Date(b.fechadoEmMs).toLocaleDateString('pt-BR')} ·{' '}
-                    {b.automatica ? 'Automática' : b.poda ? 'Poda' : 'Manual'}
-                    {b.forcada && ' (forçada)'} · {ehCartao ? 'Maquininha' : 'Banco'}
-                    {b.justificativa && ` · ${b.justificativa}`}
-                  </span>
-                  <strong>{currency.format(b.total)}</strong>
-                  <button
-                    type="button"
-                    className="pend__secundario"
-                    onClick={() => handleRestaurar(b)}
-                    disabled={restaurandoId === b.id}
-                  >
-                    {restaurandoId === b.id ? 'Restaurando…' : 'Restaurar'}
-                  </button>
-                </div>
-
-                <div className="pend__grid">
-                  <section className="pend__col">
-                    <div className="pend__col-header">
-                      <h3 className="pend__col-title">CDS — vendas</h3>
-                    </div>
-                    <div className="pend__col-scroll">
-                      <table className="crud-tab__table pend__table">
-                        <thead>
-                          <tr>
-                            <th>Data</th>
-                            <th>N°</th>
-                            <th>Cliente</th>
-                            <th>Forma</th>
-                            <th className="extrato__num">Valor</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {vendasDaBaixa.map((v) => (
-                            <tr key={v.id}>
-                              <td>{formatarData(v.data)}</td>
-                              <td>{v.numeroVenda || '—'}</td>
-                              <td>{v.clienteNome}</td>
-                              <td className="pend__forma">{v.forma}</td>
-                              <td className="extrato__num">{currency.format(v.valor)}</td>
-                            </tr>
-                          ))}
-                          {vendasDaBaixa.length === 0 && (
-                            <tr>
-                              <td colSpan={5} className="crud-tab__empty">
-                                Sem venda associada (só gasto/pagamento).
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </section>
-
-                  <section className="pend__col">
-                    <div className="pend__col-header">
-                      <h3 className="pend__col-title">
-                        {ehCartao ? 'Maquininha' : 'Extrato'} — pagamento(s)
-                      </h3>
-                    </div>
-                    <div className="pend__col-scroll">
-                      <table className="crud-tab__table pend__table">
-                        <thead>
-                          <tr>
-                            <th>Data</th>
-                            {ehCartao ? (
-                              <>
-                                <th>Bandeira</th>
-                                <th>Parcelas</th>
-                              </>
-                            ) : (
-                              <>
-                                <th>Conta / histórico</th>
-                                <th>Forma</th>
-                              </>
-                            )}
-                            <th className="extrato__num">Valor</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {lancamentosDaBaixa.map((l) => (
-                            <tr key={l.id}>
-                              <td>{formatarData(l.data)}</td>
-                              {ehCartao ? (
-                                <>
-                                  <td>{l.bandeira}</td>
-                                  <td>{l.parcelas > 1 ? `${l.parcelas}x` : 'à vista'}</td>
-                                </>
-                              ) : (
-                                <>
-                                  <td>{l.contraparteNome || l.historico}</td>
-                                  <td className="pend__forma-col">
-                                    {l.tipo === 'credito' ? 'Crédito' : 'Débito'}
-                                  </td>
-                                </>
-                              )}
-                              <td className="extrato__num">{currency.format(l.valor)}</td>
-                            </tr>
-                          ))}
-                          {lancamentosDaBaixa.length === 0 && (
-                            <tr>
-                              <td colSpan={3} className="crud-tab__empty">
-                                Sem pagamento associado.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </section>
-                </div>
-              </div>
-            );
-          })}
+          <div className="fech__lista-baixas">
+            {cards.map(({ baixa, vendas, lancamentos }) => (
+              <BaixaCard
+                key={baixa.id}
+                baixa={baixa}
+                vendas={vendas}
+                lancamentos={lancamentos}
+                restaurando={restaurandoId === baixa.id}
+                onRestaurar={handleRestaurar}
+              />
+            ))}
+          </div>
 
           {resultado.baixas.length === 0 && (
             <p className="crud-tab__empty">Nenhum fechamento encontrado com esses filtros.</p>

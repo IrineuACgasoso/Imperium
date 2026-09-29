@@ -1,0 +1,67 @@
+/* Modo "lápis" (poda de inconsistências antigas). */
+
+.pend__lapis {
+  border: 1px solid var(--panel-border-soft);
+  background: rgba(61, 30, 115, 0.32);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  width: 34px;
+  height: 34px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.pend__lapis:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-cyan);
+}
+
+.pend__lapis.is-active {
+  color: var(--bg-void);
+  background: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+}
+
+.pend__poda-barra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: rgba(53, 230, 216, 0.08);
+  border: 1px solid rgba(53, 230, 216, 0.35);
+  border-radius: var(--radius-control);
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.pend__lapis-todas {
+  border: 1px solid var(--accent-cyan);
+  background: transparent;
+  color: var(--accent-cyan);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pend__lapis-todas:hover {
+  background: rgba(53, 230, 216, 0.15);
+}
+
+.pend__poda-col {
+  width: 1%;
+  text-align: center;
+}
+
+.pend__selecao.is-poda {
+  border-color: rgba(53, 230, 216, 0.45);
+}
+
+.pend__primario.is-poda {
+  background: var(--accent-cyan);
+  color: var(--bg-void);
+}

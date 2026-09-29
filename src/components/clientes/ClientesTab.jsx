@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { VENDAS_EM_ABERTO } from '../../data/filtrosAbertos.js';
 import { useFilialCollection } from '../../hooks/useFilialCollection.js';
 import { handleEnterNavigation, focusFirstField } from '../../utils/formNav.js';
 import FirebaseGate from '../layout/FirebaseGate.jsx';
@@ -30,7 +31,12 @@ function ClientesTabInner({ filialId }) {
   // precisam contar no total dele. A fonte é a mesma fila de conciliação
   // (pendenciasVendas) que a aba Pendências usa, filtrada só pra dinheiro
   // pra não contar de novo um Pix/cartão que já é somado via extrato.
-  const { items: vendasCaixa } = useFilialCollection(filialId, 'pendenciasVendas', 'data');
+  const { items: vendasCaixa } = useFilialCollection(
+    filialId,
+    'pendenciasVendas',
+    null,
+    VENDAS_EM_ABERTO
+  );
   const [busca, setBusca] = useState('');
   const [selecionado, setSelecionado] = useState(null);
   const [buscaGrafico, setBuscaGrafico] = useState('');

@@ -1,0 +1,206 @@
+/* Layout de Pendências: grid de duas colunas e tabelas roláveis.
+   Também usado por Fechamentos (import direto deste arquivo). */
+
+.pend {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  /* Filho de flex (.dashboard__main): sem isto o mínimo é o conteúdo e a
+     tela inteira cresce pra direita quando um texto é largo. */
+  min-width: 0;
+}
+
+.pend__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.pend__titulo {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+}
+
+/* minmax(0, 1fr): `1fr` puro tem mínimo = largura do conteúdo, então uma
+   tabela larga esticava a coluna e empurrava a outra. Com 0, cada coluna
+   fica com metade do espaço e o excesso rola dentro de .pend__col-scroll. */
+.pend__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.pend__col {
+  min-width: 0;
+}
+
+/* As duas tabelas têm a MESMA altura máxima, com scroll interno cada uma
+   (o extrato tem linhas mais miúdas que o CDS, então igualar por nº de
+   linhas não funciona). Altura limitada também evita que a página cresça
+   sem limite e reduz a área que o navegador rasteriza no scroll. */
+.pend__col-scroll {
+  max-height: 90vh;
+  overflow: auto;
+  border: 1px solid rgba(242, 233, 251, 0.08);
+  border-radius: var(--radius-control);
+}
+
+.pend__col-scroll .crud-tab__table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-deep);
+  z-index: 1;
+}
+
+@media (max-width: 1100px) {
+  .pend__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pend__col-scroll {
+    max-height: 72vh;
+  }
+}
+
+.pend__col-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pend__col-header-left {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pend__col-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.pend__busca-cliente {
+  background: var(--bg-deep);
+  border: 1px solid rgba(242, 233, 251, 0.16);
+  border-radius: var(--radius-control);
+  color: var(--text-primary);
+  padding: 4px 10px;
+  font-size: 12px;
+  min-width: 160px;
+}
+
+.pend__busca-cliente:focus {
+  outline: none;
+  border-color: rgba(242, 233, 251, 0.4);
+}
+
+.pend__fonte-extrato {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.pend__fonte-extrato-btn {
+  border: 1px solid var(--border-subtle, #444);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.pend__fonte-extrato-btn.is-active {
+  background: var(--accent, #7c5cff);
+  border-color: var(--accent, #7c5cff);
+  color: #fff;
+}
+
+.pend__filtro-data {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.pend__filtro-data input[type='date'] {
+  background: rgba(18, 8, 33, 0.45);
+  border: 1px solid rgba(242, 233, 251, 0.16);
+  border-radius: 6px;
+  color: var(--text-primary);
+  padding: 3px 6px;
+  font-size: 11.5px;
+}
+
+.pend__filtro-data-limpar {
+  border: none;
+  background: transparent;
+  color: var(--accent-cyan);
+  text-decoration: underline;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pend__table tbody tr {
+  cursor: pointer;
+}
+
+.pend__table tbody tr:hover {
+  background: rgba(242, 233, 251, 0.04);
+}
+
+.pend__table tbody tr.is-selected {
+  background: rgba(53, 230, 216, 0.14);
+  box-shadow: inset 3px 0 0 var(--accent-cyan);
+}
+
+/* Nome comprido sem espaço (CNPJ, razão social) quebra em vez de alargar a tabela. */
+.pend__table td {
+  overflow-wrap: anywhere;
+}
+
+.pend__table .extrato__num {
+  white-space: nowrap;
+}
+
+.pend__forma {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.pend__forma-col {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  width: 1%;
+}
+
+.pend__seta-ordem {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+  vertical-align: middle;
+}
+
+.pend__seta-ordem:hover {
+  color: var(--accent-cyan);
+}

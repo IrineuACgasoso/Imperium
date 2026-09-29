@@ -1,16 +1,19 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { collection, addDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import Sidebar from '../layout/Sidebar.jsx';
-import PerformanceChart from './PerformanceChart.jsx';
-import FuncionariosTab from '../funcionarios/FuncionariosTab.jsx';
-import ClientesTab from '../clientes/ClientesTab.jsx';
-import VendasTab from '../vendas/VendasTab.jsx';
-import PendenciasTab from '../pendencias/PendenciasTab.jsx';
-import FechamentosTab from '../fechamentos/FechamentosTab.jsx';
-import ExtratoTab from '../extrato/ExtratoTab.jsx';
 import { db, auth, firebaseIsConfigured } from '../../config/firebase.js';
 import './Dashboard.css';
+
+// Cada aba vira um chunk próprio: pdfjs, exceljs, xlsx e recharts só são
+// baixados quando a aba que os usa é aberta (antes: um bundle único de ~2,9 MB).
+const PerformanceChart = lazy(() => import('./PerformanceChart.jsx'));
+const FuncionariosTab = lazy(() => import('../funcionarios/FuncionariosTab.jsx'));
+const ClientesTab = lazy(() => import('../clientes/ClientesTab.jsx'));
+const VendasTab = lazy(() => import('../vendas/VendasTab.jsx'));
+const PendenciasTab = lazy(() => import('../pendencias/PendenciasTab.jsx'));
+const FechamentosTab = lazy(() => import('../fechamentos/FechamentosTab.jsx'));
+const ExtratoTab = lazy(() => import('../extrato/ExtratoTab.jsx'));
 
 const TAB_LABELS = {
   vendas: 'Vendas',
@@ -94,7 +97,9 @@ export default function Dashboard({ onLogout }) {
         {activeTab !== 'extrato' && activeTab !== 'pendencias' && activeTab !== 'clientes' && activeTab !== 'fechamentos' && (
           <div className="dashboard__chart-slot">
             {activeFilialId && (
-              <PerformanceChart filialId={activeFilialId} mode={chartMode} key={activeFilialId} />
+              <Suspense fallback={null}>
+                <PerformanceChart filialId={activeFilialId} mode={chartMode} key={activeFilialId} />
+              </Suspense>
             )}
           </div>
         )}
@@ -102,6 +107,7 @@ export default function Dashboard({ onLogout }) {
         {activeTab && activeFilialId && (
           <div className="dashboard__tab-panel">
             <span className="dashboard__tab-eyebrow">{TAB_LABELS[activeTab]}</span>
+            <Suspense fallback={<p className="dashboard__tab-empty">Carregando…</p>}>
 
             {activeTab === 'vendas' && <VendasTab filialId={activeFilialId} />}
             {activeTab === 'funcionarios' && <FuncionariosTab filialId={activeFilialId} />}
@@ -114,6 +120,7 @@ export default function Dashboard({ onLogout }) {
             {activeTab === 'extrato' && (
               <ExtratoTab filialId={activeFilialId} key={activeFilialId} />
             )}
+            </Suspense>
           </div>
         )}
       </main>

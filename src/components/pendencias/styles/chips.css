@@ -1,0 +1,61 @@
+.pend__toolbar {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.pend__formas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pend__forma-chip {
+  padding: 6px 13px;
+  border-radius: 999px;
+  border: 1px solid rgba(242, 233, 251, 0.16);
+  background: rgba(18, 8, 33, 0.45);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.pend__forma-chip:hover {
+  border-color: var(--accent-neon);
+  color: var(--text-primary);
+}
+
+.pend__forma-chip.is-active {
+  background: var(--accent-neon-dim);
+  border-color: var(--accent-neon);
+  color: var(--text-primary);
+}
+
+.pend__forma-chip--all {
+  font-weight: 600;
+  background: rgba(53, 230, 216, 0.1);
+  border-color: rgba(53, 230, 216, 0.4);
+  color: var(--accent-cyan);
+  margin-right: 4px;
+}
+
+.pend__forma-chip--all:hover {
+  border-color: var(--accent-cyan);
+  color: var(--text-primary);
+}
+
+.pend__formas-empty {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.pend__contagem {
+  color: var(--text-muted);
+}
